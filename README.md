@@ -8,7 +8,7 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 - 🎯 **精准提取**：支持 XPath 和 CSS 选择器精确提取监控内容
 - 🔗 **文章链接**：支持提取文章URL和标题，RSS中包含直达链接
 - 📰 **RSS 订阅**：自动生成 RSS/Atom/JSON Feed，支持各种 RSS 阅读器
-- 💾 **状态持久化**：使用 Vercel Edge Config 存储历史状态（超低延迟）
+- 💾 **状态持久化**：使用 Supabase PostgreSQL 存储历史状态
 - 🔔 **变更记录**：保留最近 100 条变更历史
 
 ## 🚀 快速开始
@@ -17,21 +17,52 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/AI-Blog-Detection)
 
-### 2. 配置 Vercel Edge Config
+### 2. 配置 Supabase 存储
 
 1. 在 Vercel 控制台进入你的项目
-2. 点击 **Storage** → **Create Database** → 选择 **Edge Config**
-3. 创建后，点击 **Connect to Project** 连接到你的项目
-4. Vercel 会自动设置 `EDGE_CONFIG` 环境变量
+2. 点击 **Storage** → **Create Database** → 选择 **Supabase**
+3. 按照提示完成 Supabase 配置
+4. Vercel 会自动设置所需的环境变量
 
-**配置写入功能**（可选，用于持久化存储）：
+### 3. 初始化数据库表
 
-5. 进入 Edge Config 详情页，复制 **Edge Config ID**
-6. 在 **Settings** → **Environment Variables** 中添加：
-   - `EDGE_CONFIG_ID`: 你的 Edge Config ID
-   - `VERCEL_API_TOKEN`: 从 [Vercel Settings](https://vercel.com/account/tokens) 创建的 API Token
+在 Supabase 控制台中：
+1. 进入你的项目 → **SQL Editor**
+2. 运行 `supabase/init.sql` 中的 SQL 脚本创建表
 
-### 3. 配置监控网站
+```sql
+-- 创建站点状态表
+CREATE TABLE IF NOT EXISTS site_states (
+  id TEXT PRIMARY KEY,
+  content_hash TEXT NOT NULL,
+  content TEXT NOT NULL,
+  last_checked TIMESTAMPTZ NOT NULL,
+  last_changed TIMESTAMPTZ,
+  articles JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 创建变更记录表
+CREATE TABLE IF NOT EXISTS change_records (
+  id SERIAL PRIMARY KEY,
+  site_id TEXT NOT NULL,
+  site_name TEXT NOT NULL,
+  site_url TEXT NOT NULL,
+  changed_at TIMESTAMPTZ NOT NULL,
+  old_content TEXT,
+  new_content TEXT NOT NULL,
+  description TEXT,
+  new_articles JSONB,
+  old_articles JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_change_records_changed_at ON change_records(changed_at DESC);
+```
+
+### 4. 配置监控网站
 
 编辑 `src/config/sites.ts` 文件，添加你要监控的网站：
 
@@ -49,7 +80,7 @@ export const sitesConfig: SiteConfig[] = [
 ];
 ```
 
-### 4. 订阅 RSS
+### 5. 订阅 RSS
 
 部署完成后，访问以下地址订阅：
 
@@ -86,22 +117,6 @@ export const sitesConfig: SiteConfig[] = [
 
 // 提取id为content的元素
 "//*[@id='content']"
-
-// 提取所有链接文本
-"//a/text()"
-```
-
-### CSS 选择器示例
-
-```javascript
-// 提取所有h2标题
-"h2"
-
-// 提取特定class的元素
-".news-list h2"
-
-// 提取id为content的元素
-"#content"
 ```
 
 ## 🔌 API 端点
@@ -118,24 +133,9 @@ export const sitesConfig: SiteConfig[] = [
 
 获取监控状态
 
-**返回**：
-```json
-{
-  "lastUpdated": "2024-01-01T00:00:00.000Z",
-  "totalSites": 5,
-  "enabledSites": 4,
-  "recentChanges": 10,
-  "sites": [...]
-}
-```
+### POST /api/trigger 或 GET /api/trigger
 
-### POST /api/trigger
-
-手动触发检测
-
-**参数**：
-- `site`: 指定网站ID（可选，不填则检测全部）
-- `key`: API密钥（如果设置了`API_KEY`环境变量）
+手动触发检测（也可在首页点击按钮触发）
 
 ### GET /api/cron
 
@@ -145,13 +145,12 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
-| `EDGE_CONFIG` | ✅ | Edge Config 连接字符串（自动设置） |
-| `EDGE_CONFIG_ID` | ❌ | Edge Config ID（用于写入，需手动设置） |
-| `VERCEL_API_TOKEN` | ❌ | Vercel API Token（用于写入，需手动设置） |
+| `SUPABASE_URL` | ✅ | Supabase 项目 URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase Service Role Key |
 | `CRON_SECRET` | ❌ | Cron 请求验证密钥 |
 | `API_KEY` | ❌ | 手动触发API的访问密钥 |
 
-> **注意**：如果不配置 `EDGE_CONFIG_ID` 和 `VERCEL_API_TOKEN`，检测功能仍然可用，但数据只会保存在内存中，重启后会丢失。
+> Vercel + Supabase 集成会自动设置这些环境变量
 
 ## 📅 Cron 调度
 
@@ -170,19 +169,11 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 }
 ```
 
-常用 Cron 表达式：
-- `0 8 * * *` - 每天 UTC 08:00
-- `0 */6 * * *` - 每6小时
-- `0 0 * * 1` - 每周一 UTC 00:00
-
 ## 🛠️ 本地开发
 
 ```bash
 # 安装依赖
 npm install
-
-# 拉取环境变量（需要先 vercel login）
-vercel env pull
 
 # 启动开发服务器
 npx vercel dev

@@ -2,7 +2,7 @@
  * RSS生成模块
  */
 import { Feed } from 'feed';
-import type { ChangeRecord } from '../types/index.js';
+import type { ChangeRecord, ArticleInfo } from '../types/index.js';
 
 export interface RSSOptions {
   /** 订阅标题 */
@@ -18,12 +18,35 @@ export interface RSSOptions {
 }
 
 const DEFAULT_OPTIONS: RSSOptions = {
-  title: 'WebDetect - 网页变更检测',
-  description: '监控网页内容变更，及时获取更新通知',
-  link: 'https://webdetect.vercel.app',
-  author: 'WebDetect',
+  title: 'AI-Blog-Detection - AI博客变更检测',
+  description: '监控AI博客内容变更，及时获取更新通知',
+  link: 'https://ai-blog-detection.vercel.app',
+  author: 'AI-Blog-Detection',
   language: 'zh-CN',
 };
+
+/**
+ * 生成文章列表HTML
+ */
+function generateArticleListHtml(articles: ArticleInfo[]): string {
+  if (!articles || articles.length === 0) {
+    return '';
+  }
+  
+  let html = '<h4 style="color: #3b82f6; margin: 10px 0 5px;">📝 新文章列表:</h4>';
+  html += '<ul style="margin: 0; padding-left: 20px;">';
+  
+  for (const article of articles) {
+    if (article.url) {
+      html += `<li style="margin: 5px 0;"><a href="${escapeHtml(article.url)}" style="color: #3b82f6; text-decoration: none;">${escapeHtml(article.title)}</a></li>`;
+    } else {
+      html += `<li style="margin: 5px 0;">${escapeHtml(article.title)}</li>`;
+    }
+  }
+  
+  html += '</ul>';
+  return html;
+}
 
 /**
  * 生成RSS Feed
@@ -42,18 +65,21 @@ export function generateRSS(
     language: opts.language,
     copyright: `Copyright ${new Date().getFullYear()}`,
     updated: changes.length > 0 ? new Date(changes[0].changedAt) : new Date(),
-    generator: 'WebDetect RSS Generator',
+    generator: 'AI-Blog-Detection RSS Generator',
     author: opts.author ? { name: opts.author } : undefined,
   });
 
   // 添加变更条目
   for (const change of changes) {
-    const contentDiff = generateContentDiff(change.oldContent, change.newContent);
+    const contentDiff = generateContentDiff(change.oldContent, change.newContent, change.newArticles);
+    
+    // 如果有新文章且新文章有URL，使用第一篇新文章的URL作为链接
+    const itemLink = change.newArticles?.[0]?.url || change.siteUrl;
     
     feed.addItem({
       title: `[更新] ${change.siteName}`,
       id: `${change.siteId}-${change.changedAt}`,
-      link: change.siteUrl,
+      link: itemLink,
       description: change.description || `检测到 ${change.siteName} 发生了变更`,
       content: contentDiff,
       date: new Date(change.changedAt),
@@ -81,17 +107,18 @@ export function generateAtom(
     language: opts.language,
     copyright: `Copyright ${new Date().getFullYear()}`,
     updated: changes.length > 0 ? new Date(changes[0].changedAt) : new Date(),
-    generator: 'WebDetect RSS Generator',
+    generator: 'AI-Blog-Detection RSS Generator',
     author: opts.author ? { name: opts.author } : undefined,
   });
 
   for (const change of changes) {
-    const contentDiff = generateContentDiff(change.oldContent, change.newContent);
+    const contentDiff = generateContentDiff(change.oldContent, change.newContent, change.newArticles);
+    const itemLink = change.newArticles?.[0]?.url || change.siteUrl;
     
     feed.addItem({
       title: `[更新] ${change.siteName}`,
       id: `${change.siteId}-${change.changedAt}`,
-      link: change.siteUrl,
+      link: itemLink,
       description: change.description || `检测到 ${change.siteName} 发生了变更`,
       content: contentDiff,
       date: new Date(change.changedAt),
@@ -118,16 +145,17 @@ export function generateJSONFeed(
     language: opts.language,
     copyright: `Copyright ${new Date().getFullYear()}`,
     updated: changes.length > 0 ? new Date(changes[0].changedAt) : new Date(),
-    generator: 'WebDetect RSS Generator',
+    generator: 'AI-Blog-Detection RSS Generator',
   });
 
   for (const change of changes) {
-    const contentDiff = generateContentDiff(change.oldContent, change.newContent);
+    const contentDiff = generateContentDiff(change.oldContent, change.newContent, change.newArticles);
+    const itemLink = change.newArticles?.[0]?.url || change.siteUrl;
     
     feed.addItem({
       title: `[更新] ${change.siteName}`,
       id: `${change.siteId}-${change.changedAt}`,
-      link: change.siteUrl,
+      link: itemLink,
       description: change.description || `检测到 ${change.siteName} 发生了变更`,
       content: contentDiff,
       date: new Date(change.changedAt),
@@ -140,11 +168,17 @@ export function generateJSONFeed(
 /**
  * 生成内容差异的HTML展示
  */
-function generateContentDiff(oldContent: string, newContent: string): string {
-  const oldLines = oldContent.split('\n');
-  const newLines = newContent.split('\n');
-
+function generateContentDiff(
+  oldContent: string, 
+  newContent: string, 
+  newArticles?: ArticleInfo[]
+): string {
   let html = '<div style="font-family: monospace; font-size: 14px;">';
+  
+  // 显示新文章列表（如果有）
+  if (newArticles && newArticles.length > 0) {
+    html += generateArticleListHtml(newArticles);
+  }
   
   // 显示旧内容
   if (oldContent) {
@@ -176,4 +210,3 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-

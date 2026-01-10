@@ -1,11 +1,12 @@
-# WebDetect 🔍
+# AI-Blog-Detection 🔍
 
-网页变更检测工具 - 自动监控网页内容变化并生成 RSS 订阅
+AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS 订阅
 
 ## ✨ 功能特性
 
-- 📡 **定时检测**：通过 Vercel Cron 每天自动检测网页变更
+- 📡 **定时检测**：通过 Vercel Cron 每天自动检测博客变更
 - 🎯 **精准提取**：支持 XPath 和 CSS 选择器精确提取监控内容
+- 🔗 **文章链接**：支持提取文章URL和标题，RSS中包含直达链接
 - 📰 **RSS 订阅**：自动生成 RSS/Atom/JSON Feed，支持各种 RSS 阅读器
 - 💾 **状态持久化**：使用 Vercel KV 存储历史状态
 - 🔔 **变更记录**：保留最近 100 条变更历史
@@ -14,7 +15,7 @@
 
 ### 1. 部署到 Vercel
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/webdetect)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/AI-Blog-Detection)
 
 ### 2. 配置 Vercel KV
 
@@ -30,10 +31,11 @@
 [
   {
     "id": "my-site",
-    "name": "我的网站",
-    "url": "https://example.com/page",
-    "xpath": "//div[@class='content']//h2",
-    "description": "监控示例网站的标题变化",
+    "name": "我的博客",
+    "url": "https://example.com/blog",
+    "xpath": "//article//h2",
+    "articleUrlXPath": "//article//a/@href",
+    "description": "监控示例博客的最新文章",
     "enabled": true
   }
 ]
@@ -56,7 +58,8 @@
 | `id` | string | ✅ | 唯一标识符 |
 | `name` | string | ✅ | 网站名称（显示在RSS中） |
 | `url` | string | ✅ | 要监控的网页URL |
-| `xpath` | string | ⭕ | XPath表达式 |
+| `xpath` | string | ⭕ | XPath表达式（提取标题内容） |
+| `articleUrlXPath` | string | ❌ | 文章URL的XPath表达式 |
 | `cssSelector` | string | ⭕ | CSS选择器（与xpath二选一） |
 | `description` | string | ❌ | 描述信息 |
 | `enabled` | boolean | ❌ | 是否启用（默认true） |
@@ -69,6 +72,9 @@
 
 // 提取特定class的div内容
 "//div[@class='news-list']//h2"
+
+// 提取文章链接
+"//article//a/@href"
 
 // 提取id为content的元素
 "//*[@id='content']"
@@ -167,11 +173,13 @@ npm install
 # 启动开发服务器
 npm run dev
 
-# 手动执行检测（需要配置环境变量）
-npm run check
+# 本地测试抓取
+npm run test
+
+# 测试特定网站
+npm run test:site cursor-blog
 ```
 
 ## 📄 License
 
 MIT License
-

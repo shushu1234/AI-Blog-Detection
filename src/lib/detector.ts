@@ -1,9 +1,9 @@
 /**
  * 变更检测模块
  */
-import type { SiteConfig, SiteState, ChangeRecord, DetectionResult } from '../types/index.js';
+import type { SiteConfig, SiteState, ChangeRecord, DetectionResult, ArticleInfo } from '../types/index.js';
 import { fetchPage } from './fetcher.js';
-import { extractContent, hashContent } from './extractor.js';
+import { extractArticles, hashContent } from './extractor.js';
 import { getSiteState, batchUpdate } from './storage.js';
 
 /**
@@ -20,11 +20,12 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
     // 1. 抓取页面
     const html = await fetchPage(config.url);
 
-    // 2. 提取内容
-    const content = extractContent(html, config.xpath, config.cssSelector);
-    result.currentContent = content;
+    // 2. 提取内容和文章列表
+    const extraction = extractArticles(html, config);
+    result.currentContent = extraction.content;
+    result.articles = extraction.articles;
 
-    if (!content) {
+    if (!extraction.content) {
       result.error = '未能提取到任何内容，请检查XPath或CSS选择器';
       return result;
     }
@@ -34,9 +35,10 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
     
     if (previousState) {
       result.previousContent = previousState.content;
+      result.previousArticles = previousState.articles;
       
       // 4. 比较内容
-      const currentHash = await hashContent(content);
+      const currentHash = await hashContent(extraction.content);
       if (currentHash !== previousState.contentHash) {
         result.changed = true;
       }
@@ -50,6 +52,21 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
     result.error = error instanceof Error ? error.message : '未知错误';
     return result;
   }
+}
+
+/**
+ * 找出新增的文章
+ */
+function findNewArticles(
+  currentArticles: ArticleInfo[],
+  previousArticles?: ArticleInfo[]
+): ArticleInfo[] {
+  if (!previousArticles || previousArticles.length === 0) {
+    return currentArticles;
+  }
+  
+  const previousTitles = new Set(previousArticles.map(a => a.title));
+  return currentArticles.filter(a => !previousTitles.has(a.title));
 }
 
 /**
@@ -87,11 +104,17 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
           content: result.currentContent,
           lastChecked: now,
           lastChanged: result.changed ? now : undefined,
+          articles: result.articles,
         };
         statesToUpdate.push(state);
 
         // 记录变更
         if (result.changed && result.previousContent !== undefined) {
+          const newArticles = findNewArticles(
+            result.articles || [],
+            result.previousArticles
+          );
+          
           changes.push({
             siteId: config.id,
             siteName: config.name,
@@ -100,6 +123,8 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
             oldContent: result.previousContent,
             newContent: result.currentContent,
             description: config.description,
+            newArticles: newArticles.length > 0 ? newArticles : undefined,
+            oldArticles: result.previousArticles,
           });
         }
       }
@@ -120,4 +145,3 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
 
   return { results, changes };
 }
-

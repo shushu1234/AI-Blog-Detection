@@ -3,9 +3,9 @@
  * 运行: npx ts-node --esm src/scripts/test-local.ts
  */
 import { fetchPage } from '../lib/fetcher.js';
-import { extractContent, extractByXPath, hashContent } from '../lib/extractor.js';
+import { extractArticles, hashContent } from '../lib/extractor.js';
 import sitesConfig from '../config/sites.json' with { type: 'json' };
-import type { SiteConfig } from '../types/index.js';
+import type { SiteConfig, ArticleInfo } from '../types/index.js';
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -14,18 +14,33 @@ const COLORS = {
   yellow: '\x1b[33m',
   cyan: '\x1b[36m',
   dim: '\x1b[2m',
+  blue: '\x1b[34m',
 };
 
 function log(color: keyof typeof COLORS, message: string) {
   console.log(`${COLORS[color]}${message}${COLORS.reset}`);
 }
 
+function formatArticle(article: ArticleInfo, index: number): string {
+  const title = article.title.length > 60 
+    ? article.title.substring(0, 60) + '...' 
+    : article.title;
+  
+  if (article.url) {
+    return `   ${index + 1}. ${title}\n      🔗 ${article.url}`;
+  }
+  return `   ${index + 1}. ${title}`;
+}
+
 async function testSite(config: SiteConfig) {
-  console.log('\n' + '='.repeat(60));
+  console.log('\n' + '='.repeat(70));
   log('cyan', `🔍 测试: ${config.name}`);
   log('dim', `   URL: ${config.url}`);
-  log('dim', `   XPath: ${config.xpath}`);
-  console.log('='.repeat(60));
+  log('dim', `   XPath (标题): ${config.xpath}`);
+  if (config.articleUrlXPath) {
+    log('dim', `   XPath (链接): ${config.articleUrlXPath}`);
+  }
+  console.log('='.repeat(70));
 
   try {
     // 1. 抓取页面
@@ -35,11 +50,11 @@ async function testSite(config: SiteConfig) {
     const fetchTime = Date.now() - startTime;
     log('green', `✓ 页面抓取成功 (${fetchTime}ms, ${(html.length / 1024).toFixed(1)}KB)`);
 
-    // 2. 提取内容
+    // 2. 提取文章内容
     log('yellow', '\n🎯 正在提取内容...');
-    const content = extractContent(html, config.xpath, config.cssSelector);
+    const extraction = extractArticles(html, config);
     
-    if (!content) {
+    if (!extraction.content) {
       log('red', '✗ 未能提取到任何内容，请检查 XPath 表达式');
       
       // 尝试一些常见的 XPath 来帮助调试
@@ -53,8 +68,8 @@ async function testSite(config: SiteConfig) {
       ];
       
       for (const xpath of testXPaths) {
-        const testContent = extractContent(html, xpath);
-        if (testContent) {
+        const testExtraction = extractArticles(html, { ...config, xpath, articleUrlXPath: undefined });
+        if (testExtraction.content) {
           log('dim', `   ${xpath} → 找到内容`);
         }
       }
@@ -62,20 +77,31 @@ async function testSite(config: SiteConfig) {
     }
 
     // 3. 显示提取结果
-    const lines = content.split('\n').filter(l => l.trim());
-    log('green', `✓ 成功提取到 ${lines.length} 项内容:\n`);
+    const articles = extraction.articles;
+    log('green', `✓ 成功提取到 ${articles.length} 篇文章:\n`);
     
-    lines.slice(0, 10).forEach((line, i) => {
-      const truncated = line.length > 80 ? line.substring(0, 80) + '...' : line;
-      console.log(`   ${i + 1}. ${truncated}`);
-    });
+    // 显示前10篇文章
+    const displayCount = Math.min(10, articles.length);
+    for (let i = 0; i < displayCount; i++) {
+      console.log(formatArticle(articles[i], i));
+    }
     
-    if (lines.length > 10) {
-      log('dim', `   ... 还有 ${lines.length - 10} 项`);
+    if (articles.length > 10) {
+      log('dim', `\n   ... 还有 ${articles.length - 10} 篇文章`);
     }
 
-    // 4. 计算哈希
-    const hash = await hashContent(content);
+    // 4. 统计URL提取情况
+    const articlesWithUrl = articles.filter(a => a.url);
+    if (config.articleUrlXPath) {
+      if (articlesWithUrl.length > 0) {
+        log('blue', `\n📊 链接提取: ${articlesWithUrl.length}/${articles.length} 篇文章有URL`);
+      } else {
+        log('yellow', '\n⚠️  未能提取到文章链接，请检查 articleUrlXPath 配置');
+      }
+    }
+
+    // 5. 计算哈希
+    const hash = await hashContent(extraction.content);
     log('dim', `\n   内容哈希: ${hash.substring(0, 16)}...`);
 
   } catch (error) {
@@ -85,9 +111,9 @@ async function testSite(config: SiteConfig) {
 
 async function main() {
   console.log('\n');
-  log('cyan', '╔════════════════════════════════════════════════════════════╗');
-  log('cyan', '║           WebDetect 本地测试工具                           ║');
-  log('cyan', '╚════════════════════════════════════════════════════════════╝');
+  log('cyan', '╔════════════════════════════════════════════════════════════════════╗');
+  log('cyan', '║             AI-Blog-Detection 本地测试工具                         ║');
+  log('cyan', '╚════════════════════════════════════════════════════════════════════╝');
 
   const configs = sitesConfig as SiteConfig[];
   const enabledConfigs = configs.filter(c => c.enabled !== false);
@@ -117,4 +143,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

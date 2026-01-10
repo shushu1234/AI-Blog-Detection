@@ -28,8 +28,8 @@ export default async function handler(
     const baseUrl = `https://${req.headers.host}`;
     
     const options = {
-      title: 'WebDetect - 网页变更检测',
-      description: '监控网页内容变更，及时获取更新通知',
+      title: 'AI-Blog-Detection - AI博客变更检测',
+      description: '监控AI博客内容变更，及时获取更新通知',
       link: baseUrl,
     };
 

@@ -4,8 +4,8 @@
 import { kv } from '@vercel/kv';
 import type { StorageData, SiteState, ChangeRecord } from '../types/index.js';
 
-const STORAGE_KEY = 'webdetect:state';
-const CHANGES_KEY = 'webdetect:changes';
+const STORAGE_KEY = 'ai-blog-detection:state';
+const CHANGES_KEY = 'ai-blog-detection:changes';
 const MAX_CHANGES = 100; // 最多保留100条变更记录
 
 /**

@@ -8,14 +8,26 @@ export interface SiteConfig {
   name: string;
   /** 要检测的URL */
   url: string;
-  /** XPath表达式，用于提取要监控的内容 */
+  /** XPath表达式，用于提取要监控的内容（文章标题） */
   xpath: string;
+  /** 可选：文章URL的XPath表达式 */
+  articleUrlXPath?: string;
   /** 可选：CSS选择器（如果不使用XPath） */
   cssSelector?: string;
   /** 可选：自定义描述 */
   description?: string;
   /** 是否启用 */
   enabled?: boolean;
+}
+
+/**
+ * 文章信息
+ */
+export interface ArticleInfo {
+  /** 文章标题 */
+  title: string;
+  /** 文章URL */
+  url?: string;
 }
 
 /**
@@ -32,6 +44,8 @@ export interface SiteState {
   lastChecked: string;
   /** 上次变更时间 */
   lastChanged?: string;
+  /** 文章列表 */
+  articles?: ArticleInfo[];
 }
 
 /**
@@ -52,6 +66,10 @@ export interface ChangeRecord {
   newContent: string;
   /** 变更描述 */
   description?: string;
+  /** 新增的文章列表 */
+  newArticles?: ArticleInfo[];
+  /** 旧的文章列表 */
+  oldArticles?: ArticleInfo[];
 }
 
 /**
@@ -80,5 +98,18 @@ export interface DetectionResult {
   previousContent?: string;
   /** 错误信息 */
   error?: string;
+  /** 当前文章列表 */
+  articles?: ArticleInfo[];
+  /** 之前的文章列表 */
+  previousArticles?: ArticleInfo[];
 }
 
+/**
+ * 提取结果
+ */
+export interface ExtractionResult {
+  /** 提取的内容（标题列表拼接） */
+  content: string;
+  /** 文章列表（包含标题和URL） */
+  articles: ArticleInfo[];
+}

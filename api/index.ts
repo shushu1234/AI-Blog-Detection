@@ -16,7 +16,7 @@ export default async function handler(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebDetect - 网页变更检测</title>
+  <title>AI-Blog-Detection - AI博客变更检测</title>
   <style>
     :root {
       --bg: #0a0a0b;
@@ -162,8 +162,8 @@ export default async function handler(
   <div class="container">
     <header class="header">
       <div class="logo">🔍</div>
-      <h1>WebDetect</h1>
-      <p class="subtitle">网页变更检测 · 自动生成 RSS 订阅</p>
+      <h1>AI-Blog-Detection</h1>
+      <p class="subtitle">AI博客变更检测 · 自动生成 RSS 订阅</p>
     </header>
 
     <div class="card">

@@ -11,14 +11,10 @@
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
-    "@types/jsdom": "^27.0.0",
     "@vercel/edge-config": "^1.4.3",
     "cheerio": "^1.0.0-rc.12",
     "feed": "^4.2.2",
-    "jsdom": "^27.0.1",
-    "linkedom": "^0.16.8",
-    "node-fetch": "^3.3.2",
-    "xpath": "^0.0.34"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

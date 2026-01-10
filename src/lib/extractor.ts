@@ -1,46 +1,83 @@
 /**
- * 内容提取模块 - 支持XPath和CSS选择器
+ * 内容提取模块 - 使用 Cheerio 进行 DOM 操作
+ * 支持简化的 XPath 语法和 CSS 选择器
  */
 import * as cheerio from 'cheerio';
-import { JSDOM } from 'jsdom';
+import type { CheerioAPI, Cheerio, Element } from 'cheerio';
 import type { ArticleInfo, ExtractionResult, SiteConfig } from '../types/index.js';
 
 /**
- * 使用XPath提取内容
+ * 将简单的 XPath 转换为 CSS 选择器
+ * 支持的 XPath 语法：
+ * - //tag -> tag
+ * - //tag[@attr='value'] -> tag[attr='value']
+ * - //tag[@attr] -> tag[attr]
+ * - //tag//subtag -> tag subtag
+ * - //*[@id='value'] -> [id='value']
+ */
+function xpathToCssSelector(xpath: string): { selector: string; isAttr: boolean; attrName?: string } {
+  // 检查是否是属性选择器（如 @href）
+  const attrMatch = xpath.match(/\/@(\w+)$/);
+  if (attrMatch) {
+    const attrName = attrMatch[1];
+    const basePath = xpath.replace(/\/@\w+$/, '');
+    const baseSelector = convertXPathPart(basePath);
+    return { selector: baseSelector, isAttr: true, attrName };
+  }
+  
+  return { selector: convertXPathPart(xpath), isAttr: false };
+}
+
+/**
+ * 转换 XPath 路径部分为 CSS 选择器
+ */
+function convertXPathPart(xpath: string): string {
+  let css = xpath
+    // 移除开头的 //
+    .replace(/^\/\//, '')
+    // 处理 //* 
+    .replace(/^\*/, '*')
+    // 处理 // 为后代选择器
+    .replace(/\/\//g, ' ')
+    // 处理 / 为子选择器
+    .replace(/\//g, ' > ')
+    // 处理 [@attr='value']
+    .replace(/\[@(\w+)='([^']+)'\]/g, '[$1="$2"]')
+    .replace(/\[@(\w+)="([^"]+)"\]/g, '[$1="$2"]')
+    // 处理 [@attr]
+    .replace(/\[@(\w+)\]/g, '[$1]')
+    // 处理谓词 [tag] -> :has(tag)
+    .replace(/\[(\w+)\]/g, ':has($1)')
+    // 处理 text()
+    .replace(/\/text\(\)$/, '');
+  
+  return css.trim();
+}
+
+/**
+ * 使用 Cheerio 提取内容
  */
 export function extractByXPath(html: string, xpath: string): string[] {
   try {
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
+    const $ = cheerio.load(html);
+    const { selector, isAttr, attrName } = xpathToCssSelector(xpath);
     
-    // 使用document.evaluate进行XPath查询
-    const result = document.evaluate(
-      xpath,
-      document,
-      null,
-      dom.window.XPathResult.ORDERED_NODE_ITERATOR_TYPE,
-      null
-    );
-
     const contents: string[] = [];
-    let node = result.iterateNext();
     
-    while (node) {
-      // 检查是否是属性节点（如 @href）
-      if (node.nodeType === dom.window.Node.ATTRIBUTE_NODE) {
-        const attrValue = (node as Attr).value?.trim();
-        if (attrValue) {
-          contents.push(attrValue);
+    $(selector).each((_, element) => {
+      if (isAttr && attrName) {
+        const value = $(element).attr(attrName);
+        if (value?.trim()) {
+          contents.push(value.trim());
         }
       } else {
-        const text = node.textContent?.trim();
+        const text = $(element).text().trim();
         if (text) {
           contents.push(text);
         }
       }
-      node = result.iterateNext();
-    }
-
+    });
+    
     return contents;
   } catch (error) {
     console.error('XPath提取失败:', error);
@@ -49,47 +86,30 @@ export function extractByXPath(html: string, xpath: string): string[] {
 }
 
 /**
- * 使用XPath提取属性值（如href）
+ * 使用 Cheerio 提取属性值
  */
 export function extractAttributesByXPath(html: string, xpath: string): string[] {
   try {
-    const dom = new JSDOM(html);
-    const document = dom.window.document;
+    const $ = cheerio.load(html);
+    const { selector, isAttr, attrName } = xpathToCssSelector(xpath);
     
-    const result = document.evaluate(
-      xpath,
-      document,
-      null,
-      dom.window.XPathResult.ORDERED_NODE_ITERATOR_TYPE,
-      null
-    );
-
     const values: string[] = [];
-    let node = result.iterateNext();
     
-    while (node) {
-      // 如果是属性节点
-      if (node.nodeType === dom.window.Node.ATTRIBUTE_NODE) {
-        const value = (node as Attr).value?.trim();
-        if (value) {
-          values.push(value);
-        }
-      } else if (node.nodeType === dom.window.Node.ELEMENT_NODE) {
-        // 如果是元素节点，尝试获取href属性
-        const href = (node as Element).getAttribute('href');
-        if (href) {
-          values.push(href.trim());
+    $(selector).each((_, element) => {
+      if (isAttr && attrName) {
+        const value = $(element).attr(attrName);
+        if (value?.trim()) {
+          values.push(value.trim());
         }
       } else {
-        // 文本节点
-        const text = node.textContent?.trim();
-        if (text) {
-          values.push(text);
+        // 尝试获取 href 属性
+        const href = $(element).attr('href');
+        if (href?.trim()) {
+          values.push(href.trim());
         }
       }
-      node = result.iterateNext();
-    }
-
+    });
+    
     return values;
   } catch (error) {
     console.error('XPath属性提取失败:', error);

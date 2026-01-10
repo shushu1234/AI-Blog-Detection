@@ -108,8 +108,8 @@ export const sitesConfig: SiteConfig[] = [
     id: 'crewai-blog',
     name: 'CrewAI Blog',
     url: 'https://www.crewai.com/blog',
-    // CrewAI 可能是 SPA，先用通用选择器
-    cssSelector: 'main h2, main h3, [class*="post"] h2',
+    // SPA 网站，使用通用标题选择器
+    cssSelector: 'h1, h2, h3',
     articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
     description: '监控 CrewAI Blog 的最新文章',
     enabled: true,
@@ -127,7 +127,8 @@ export const sitesConfig: SiteConfig[] = [
     id: 'letta-blog',
     name: 'Letta Blog',
     url: 'https://www.letta.com/blog',
-    cssSelector: 'main h2, main h3, a[href*="/blog/"] h2',
+    // SPA 网站，使用通用标题选择器
+    cssSelector: 'h2, h3',
     articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
     description: '监控 Letta (MemGPT) Blog 的最新文章',
     enabled: true,
@@ -136,7 +137,8 @@ export const sitesConfig: SiteConfig[] = [
     id: 'mem0-blog',
     name: 'Mem0 Blog',
     url: 'https://mem0.ai/blog',
-    cssSelector: 'main h2, main h3, a[href*="/blog/"] h2',
+    // 标题在链接内的 h4 中
+    cssSelector: 'a[href*="/blog/"] h4',
     articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
     description: '监控 Mem0 Blog 的最新文章',
     enabled: true,
@@ -185,8 +187,9 @@ export const sitesConfig: SiteConfig[] = [
     id: 'ragflow-blog',
     name: 'RAGFlow Blog',
     url: 'https://ragflow.io/blog',
-    cssSelector: 'main h2, main h3, article h2',
-    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
+    // Docusaurus 博客，标题在 article h1 中
+    cssSelector: 'main article h1',
+    articleUrlXPath: '//main//a[contains(@href, "/blog/")]/@href',
     description: '监控 RAGFlow Blog 的最新文章',
     enabled: true,
   },
@@ -203,9 +206,9 @@ export const sitesConfig: SiteConfig[] = [
     id: 'milvus-blog',
     name: 'Milvus Blog',
     url: 'https://milvus.io/blog',
-    // 使用英文版 URL，中文版可能有问题
-    cssSelector: 'main h2, main h3, article h2',
-    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
+    // 英文版博客，标题在链接内的 h2/h3 中
+    cssSelector: 'main a[href*="/blog/"] h2, main a[href*="/blog/"] h3',
+    articleUrlXPath: '//main//a[contains(@href, "/blog/")]/@href',
     description: '监控 Milvus Blog 的最新文章',
     enabled: true,
   },

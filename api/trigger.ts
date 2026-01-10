@@ -14,8 +14,8 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
-  // 只允许POST请求
-  if (req.method !== 'POST') {
+  // 允许 POST 和 GET 请求（GET 用于页面触发）
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -24,6 +24,10 @@ export default async function handler(
   if (process.env.API_KEY && apiKey !== process.env.API_KEY) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+
+  // 设置 CORS 头
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   try {
     const siteId = req.query.site as string;
@@ -48,6 +52,7 @@ export default async function handler(
           content: result.currentContent,
           lastChecked: now,
           lastChanged: result.changed ? now : undefined,
+          articles: result.articles,
         });
 
         if (result.changed && result.previousContent !== undefined) {
@@ -59,6 +64,8 @@ export default async function handler(
             oldContent: result.previousContent,
             newContent: result.currentContent,
             description: config.description,
+            newArticles: result.articles,
+            oldArticles: result.previousArticles,
           });
         }
       }
@@ -67,25 +74,45 @@ export default async function handler(
         success: true,
         result: {
           siteId: result.siteId,
+          siteName: config.name,
+          siteUrl: config.url,
           changed: result.changed,
           error: result.error,
-          contentPreview: result.currentContent.substring(0, 200),
+          articles: result.articles || [],
+          contentPreview: result.currentContent.substring(0, 500),
         },
       });
     } else {
       // 检测所有网站
       const { results, changes } = await detectAllSites(configs);
 
+      // 构建详细的结果
+      const detailedResults = results.map((r, i) => {
+        const config = configs.find(c => c.id === r.siteId);
+        return {
+          siteId: r.siteId,
+          siteName: config?.name || r.siteId,
+          siteUrl: config?.url || '',
+          changed: r.changed,
+          error: r.error,
+          articles: r.articles || [],
+          articleCount: r.articles?.length || 0,
+        };
+      });
+
       return res.status(200).json({
         success: true,
+        timestamp: new Date().toISOString(),
         stats: {
           total: results.length,
           changed: changes.length,
           errors: results.filter(r => r.error).length,
         },
+        results: detailedResults,
         changes: changes.map(c => ({
           site: c.siteName,
           url: c.siteUrl,
+          newArticles: c.newArticles,
         })),
       });
     }
@@ -98,4 +125,3 @@ export default async function handler(
     });
   }
 }
-

@@ -21,13 +21,33 @@ export interface SiteConfig {
 }
 
 /**
- * 文章信息
+ * 文章信息（提取结果）
  */
 export interface ArticleInfo {
   /** 文章标题 */
   title: string;
   /** 文章URL */
   url?: string;
+}
+
+/**
+ * 数据库中的文章记录
+ */
+export interface ArticleRecord {
+  /** 数据库ID */
+  id?: number;
+  /** 网站ID */
+  siteId: string;
+  /** 网站名称 */
+  siteName: string;
+  /** 文章标题 */
+  title: string;
+  /** 文章URL */
+  url: string;
+  /** 发现时间 */
+  discoveredAt: string;
+  /** 创建时间 */
+  createdAt?: string;
 }
 
 /**
@@ -44,44 +64,8 @@ export interface SiteState {
   lastChecked: string;
   /** 上次变更时间 */
   lastChanged?: string;
-  /** 文章列表 */
-  articles?: ArticleInfo[];
-}
-
-/**
- * 变更记录
- */
-export interface ChangeRecord {
-  /** 网站ID */
-  siteId: string;
-  /** 网站名称 */
-  siteName: string;
-  /** 网站URL */
-  siteUrl: string;
-  /** 变更时间 */
-  changedAt: string;
-  /** 旧内容 */
-  oldContent: string;
-  /** 新内容 */
-  newContent: string;
-  /** 变更描述 */
-  description?: string;
-  /** 新增的文章列表 */
-  newArticles?: ArticleInfo[];
-  /** 旧的文章列表 */
-  oldArticles?: ArticleInfo[];
-}
-
-/**
- * 存储的全部状态
- */
-export interface StorageData {
-  /** 各网站状态 */
-  sites: Record<string, SiteState>;
-  /** 变更历史 */
-  changes: ChangeRecord[];
-  /** 最后更新时间 */
-  lastUpdated: string;
+  /** 已知的文章URL列表（用于去重） */
+  knownArticleUrls?: string[];
 }
 
 /**
@@ -100,8 +84,8 @@ export interface DetectionResult {
   error?: string;
   /** 当前文章列表 */
   articles?: ArticleInfo[];
-  /** 之前的文章列表 */
-  previousArticles?: ArticleInfo[];
+  /** 新发现的文章 */
+  newArticles?: ArticleInfo[];
 }
 
 /**
@@ -112,4 +96,23 @@ export interface ExtractionResult {
   content: string;
   /** 文章列表（包含标题和URL） */
   articles: ArticleInfo[];
+}
+
+// 保留旧的类型用于兼容
+export interface ChangeRecord {
+  siteId: string;
+  siteName: string;
+  siteUrl: string;
+  changedAt: string;
+  oldContent: string;
+  newContent: string;
+  description?: string;
+  newArticles?: ArticleInfo[];
+  oldArticles?: ArticleInfo[];
+}
+
+export interface StorageData {
+  sites: Record<string, SiteState>;
+  changes: ChangeRecord[];
+  lastUpdated: string;
 }

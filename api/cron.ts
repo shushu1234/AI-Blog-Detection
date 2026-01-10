@@ -5,7 +5,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites } from '../src/lib/detector.js';
 import { sitesConfig } from '../src/config/sites.js';
-import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -26,24 +25,25 @@ export default async function handler(
     console.log(`共有 ${sitesConfig.length} 个网站配置`);
 
     const startTime = Date.now();
-    const { results, changes } = await detectAllSites(sitesConfig);
+    const { results, newArticles } = await detectAllSites(sitesConfig);
     const duration = Date.now() - startTime;
 
     // 统计结果
     const stats = {
       total: results.length,
-      changed: changes.length,
+      changed: results.filter(r => r.changed).length,
       errors: results.filter(r => r.error).length,
+      newArticles: newArticles.length,
       duration: `${duration}ms`,
     };
 
     console.log('检测完成:', stats);
 
-    // 记录变更详情
-    if (changes.length > 0) {
-      console.log('发现以下变更:');
-      changes.forEach(c => {
-        console.log(`- ${c.siteName}: ${c.siteUrl}`);
+    // 记录新文章
+    if (newArticles.length > 0) {
+      console.log(`发现 ${newArticles.length} 篇新文章:`);
+      newArticles.forEach(a => {
+        console.log(`- [${a.siteName}] ${a.title}`);
       });
     }
 
@@ -51,10 +51,11 @@ export default async function handler(
       success: true,
       message: '检测完成',
       stats,
-      changes: changes.map(c => ({
-        site: c.siteName,
-        url: c.siteUrl,
-        changedAt: c.changedAt,
+      newArticles: newArticles.map(a => ({
+        site: a.siteName,
+        title: a.title,
+        url: a.url,
+        discoveredAt: a.discoveredAt,
       })),
       errors: results
         .filter(r => r.error)
@@ -72,4 +73,3 @@ export default async function handler(
     });
   }
 }
-

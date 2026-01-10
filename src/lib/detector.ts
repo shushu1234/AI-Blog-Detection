@@ -1,10 +1,11 @@
 /**
  * 变更检测模块
+ * 每篇文章独立保存到数据库
  */
-import type { SiteConfig, SiteState, ChangeRecord, DetectionResult, ArticleInfo } from '../types/index.js';
+import type { SiteConfig, SiteState, DetectionResult, ArticleInfo, ArticleRecord } from '../types/index.js';
 import { fetchPage } from './fetcher.js';
 import { extractArticles, hashContent } from './extractor.js';
-import { getSiteState, batchUpdate } from './storage.js';
+import { getSiteState, updateSiteState, filterNewArticles, addArticles } from './storage.js';
 
 /**
  * 检测单个网站
@@ -35,7 +36,6 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
     
     if (previousState) {
       result.previousContent = previousState.content;
-      result.previousArticles = previousState.articles;
       
       // 4. 比较内容
       const currentHash = await hashContent(extraction.content);
@@ -47,6 +47,21 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
       result.changed = true;
     }
 
+    // 5. 过滤出新文章（通过URL去重）
+    const newArticleRecords = await filterNewArticles(
+      extraction.articles,
+      config.id,
+      config.name
+    );
+    
+    if (newArticleRecords.length > 0) {
+      result.changed = true;
+      result.newArticles = newArticleRecords.map(r => ({
+        title: r.title,
+        url: r.url,
+      }));
+    }
+
     return result;
   } catch (error) {
     result.error = error instanceof Error ? error.message : '未知错误';
@@ -55,31 +70,15 @@ export async function detectSite(config: SiteConfig): Promise<DetectionResult> {
 }
 
 /**
- * 找出新增的文章
- */
-function findNewArticles(
-  currentArticles: ArticleInfo[],
-  previousArticles?: ArticleInfo[]
-): ArticleInfo[] {
-  if (!previousArticles || previousArticles.length === 0) {
-    return currentArticles;
-  }
-  
-  const previousTitles = new Set(previousArticles.map(a => a.title));
-  return currentArticles.filter(a => !previousTitles.has(a.title));
-}
-
-/**
- * 检测所有网站
+ * 检测所有网站并保存新文章
  */
 export async function detectAllSites(configs: SiteConfig[]): Promise<{
   results: DetectionResult[];
-  changes: ChangeRecord[];
+  newArticles: ArticleRecord[];
 }> {
   const enabledConfigs = configs.filter(c => c.enabled !== false);
   const results: DetectionResult[] = [];
-  const changes: ChangeRecord[] = [];
-  const statesToUpdate: SiteState[] = [];
+  const allNewArticles: ArticleRecord[] = [];
 
   // 并发检测所有网站
   const detectionPromises = enabledConfigs.map(config => detectSite(config));
@@ -97,35 +96,27 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
         const now = new Date().toISOString();
         const contentHash = await hashContent(result.currentContent);
         
-        // 更新状态
+        // 更新站点状态
         const state: SiteState = {
           id: config.id,
           contentHash,
           content: result.currentContent,
           lastChecked: now,
           lastChanged: result.changed ? now : undefined,
-          articles: result.articles,
+          knownArticleUrls: result.articles?.map(a => a.url).filter(Boolean) as string[],
         };
-        statesToUpdate.push(state);
+        await updateSiteState(state);
 
-        // 记录变更（包括首次检测）
-        if (result.changed) {
-          const newArticles = findNewArticles(
-            result.articles || [],
-            result.previousArticles
-          );
-          
-          changes.push({
+        // 收集新文章
+        if (result.newArticles && result.newArticles.length > 0) {
+          const newRecords = result.newArticles.map(a => ({
             siteId: config.id,
             siteName: config.name,
-            siteUrl: config.url,
-            changedAt: now,
-            oldContent: result.previousContent || '',
-            newContent: result.currentContent,
-            description: config.description,
-            newArticles: newArticles.length > 0 ? newArticles : undefined,
-            oldArticles: result.previousArticles,
-          });
+            title: a.title,
+            url: a.url || config.url,
+            discoveredAt: now,
+          }));
+          allNewArticles.push(...newRecords);
         }
       }
     } else {
@@ -138,10 +129,11 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
     }
   }
 
-  // 批量更新存储
-  if (statesToUpdate.length > 0) {
-    await batchUpdate(statesToUpdate, changes);
+  // 批量保存新文章到数据库
+  if (allNewArticles.length > 0) {
+    await addArticles(allNewArticles);
+    console.log(`保存了 ${allNewArticles.length} 篇新文章到数据库`);
   }
 
-  return { results, changes };
+  return { results, newArticles: allNewArticles };
 }

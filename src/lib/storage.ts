@@ -1,16 +1,18 @@
 /**
  * 状态存储模块 - 使用 Supabase PostgreSQL
+ * 每篇文章独立存储一条记录
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { StorageData, SiteState, ChangeRecord } from '../types/index.js';
+import type { SiteState, ArticleRecord, ArticleInfo } from '../types/index.js';
 
-const MAX_CHANGES = 100;
+const MAX_ARTICLES = 500;
 
 // Supabase 客户端（懒加载）
 let supabaseClient: SupabaseClient | null = null;
 
-// 内存缓存（作为后备）
-let memoryStorage: StorageData | null = null;
+// 内存缓存
+let memorySiteStates: Record<string, SiteState> = {};
+let memoryArticles: ArticleRecord[] = [];
 
 /**
  * 获取 Supabase 客户端
@@ -30,96 +32,6 @@ function getSupabase(): SupabaseClient | null {
   return supabaseClient;
 }
 
-
-/**
- * 获取默认存储数据
- */
-function getDefaultStorageData(): StorageData {
-  return {
-    sites: {},
-    changes: [],
-    lastUpdated: new Date().toISOString(),
-  };
-}
-
-/**
- * 获取存储数据
- */
-export async function getStorageData(): Promise<StorageData> {
-  const supabase = getSupabase();
-  
-  if (!supabase) {
-    console.log('Supabase 未配置，使用内存存储');
-    return memoryStorage || getDefaultStorageData();
-  }
-  
-  try {
-    // 获取所有站点状态
-    const { data: siteStates, error: siteError } = await supabase
-      .from('site_states')
-      .select('*');
-    
-    // 获取变更记录
-    const { data: changes, error: changeError } = await supabase
-      .from('change_records')
-      .select('*')
-      .order('changed_at', { ascending: false })
-      .limit(MAX_CHANGES);
-    
-    if (siteError || changeError) {
-      console.error('获取数据失败:', siteError || changeError);
-      return memoryStorage || getDefaultStorageData();
-    }
-    
-    // 转换为 StorageData 格式
-    const sites: Record<string, SiteState> = {};
-    for (const state of siteStates || []) {
-      sites[state.id] = {
-        id: state.id,
-        contentHash: state.content_hash,
-        content: state.content,
-        lastChecked: state.last_checked,
-        lastChanged: state.last_changed,
-        articles: state.articles,
-      };
-    }
-    
-    const changeRecords: ChangeRecord[] = (changes || []).map(c => ({
-      siteId: c.site_id,
-      siteName: c.site_name,
-      siteUrl: c.site_url,
-      changedAt: c.changed_at,
-      oldContent: c.old_content || '',
-      newContent: c.new_content,
-      description: c.description,
-      newArticles: c.new_articles,
-      oldArticles: c.old_articles,
-    }));
-    
-    const data: StorageData = {
-      sites,
-      changes: changeRecords,
-      lastUpdated: new Date().toISOString(),
-    };
-    
-    memoryStorage = data;
-    return data;
-  } catch (error) {
-    console.error('获取存储数据失败:', error);
-    return memoryStorage || getDefaultStorageData();
-  }
-}
-
-/**
- * 保存存储数据
- */
-export async function saveStorageData(data: StorageData): Promise<void> {
-  data.lastUpdated = new Date().toISOString();
-  memoryStorage = data;
-  
-  // Supabase 保存由其他函数单独处理
-}
-
 /**
  * 获取网站状态
  */
@@ -127,8 +39,7 @@ export async function getSiteState(siteId: string): Promise<SiteState | null> {
   const supabase = getSupabase();
   
   if (!supabase) {
-    const data = memoryStorage || getDefaultStorageData();
-    return data.sites[siteId] || null;
+    return memorySiteStates[siteId] || null;
   }
   
   try {
@@ -139,7 +50,7 @@ export async function getSiteState(siteId: string): Promise<SiteState | null> {
       .single();
     
     if (error || !data) {
-      return null;
+      return memorySiteStates[siteId] || null;
     }
     
     return {
@@ -148,11 +59,11 @@ export async function getSiteState(siteId: string): Promise<SiteState | null> {
       content: data.content,
       lastChecked: data.last_checked,
       lastChanged: data.last_changed,
-      articles: data.articles,
+      knownArticleUrls: data.known_article_urls,
     };
   } catch (error) {
     console.error('获取站点状态失败:', error);
-    return null;
+    return memorySiteStates[siteId] || null;
   }
 }
 
@@ -160,17 +71,10 @@ export async function getSiteState(siteId: string): Promise<SiteState | null> {
  * 更新网站状态
  */
 export async function updateSiteState(state: SiteState): Promise<void> {
+  memorySiteStates[state.id] = state;
+  
   const supabase = getSupabase();
-  
-  // 更新内存缓存
-  if (!memoryStorage) {
-    memoryStorage = getDefaultStorageData();
-  }
-  memoryStorage.sites[state.id] = state;
-  
-  if (!supabase) {
-    return;
-  }
+  if (!supabase) return;
   
   try {
     const { error } = await supabase
@@ -181,7 +85,7 @@ export async function updateSiteState(state: SiteState): Promise<void> {
         content: state.content,
         last_checked: state.lastChecked,
         last_changed: state.lastChanged,
-        articles: state.articles,
+        known_article_urls: state.knownArticleUrls,
         updated_at: new Date().toISOString(),
       });
     
@@ -194,154 +98,268 @@ export async function updateSiteState(state: SiteState): Promise<void> {
 }
 
 /**
- * 添加变更记录
+ * 添加单篇文章记录
  */
-export async function addChangeRecord(record: ChangeRecord): Promise<void> {
+export async function addArticle(article: ArticleRecord): Promise<void> {
+  memoryArticles.unshift(article);
+  if (memoryArticles.length > MAX_ARTICLES) {
+    memoryArticles = memoryArticles.slice(0, MAX_ARTICLES);
+  }
+  
   const supabase = getSupabase();
-  
-  // 更新内存缓存
-  if (!memoryStorage) {
-    memoryStorage = getDefaultStorageData();
-  }
-  memoryStorage.changes.unshift(record);
-  if (memoryStorage.changes.length > MAX_CHANGES) {
-    memoryStorage.changes = memoryStorage.changes.slice(0, MAX_CHANGES);
-  }
-  
-  if (!supabase) {
-    return;
-  }
+  if (!supabase) return;
   
   try {
     const { error } = await supabase
-      .from('change_records')
+      .from('articles')
       .insert({
-        site_id: record.siteId,
-        site_name: record.siteName,
-        site_url: record.siteUrl,
-        changed_at: record.changedAt,
-        old_content: record.oldContent,
-        new_content: record.newContent,
-        description: record.description,
-        new_articles: record.newArticles,
-        old_articles: record.oldArticles,
+        site_id: article.siteId,
+        site_name: article.siteName,
+        title: article.title,
+        url: article.url,
+        discovered_at: article.discoveredAt,
       });
     
     if (error) {
-      console.error('添加变更记录失败:', error);
+      console.error('添加文章记录失败:', error);
     }
   } catch (error) {
-    console.error('添加变更记录失败:', error);
+    console.error('添加文章记录失败:', error);
   }
 }
 
 /**
- * 获取变更记录
+ * 批量添加文章记录
  */
-export async function getChangeRecords(limit?: number): Promise<ChangeRecord[]> {
+export async function addArticles(articles: ArticleRecord[]): Promise<void> {
+  if (articles.length === 0) return;
+  
+  memoryArticles = [...articles, ...memoryArticles].slice(0, MAX_ARTICLES);
+  
+  const supabase = getSupabase();
+  if (!supabase) return;
+  
+  try {
+    const { error } = await supabase
+      .from('articles')
+      .insert(articles.map(a => ({
+        site_id: a.siteId,
+        site_name: a.siteName,
+        title: a.title,
+        url: a.url,
+        discovered_at: a.discoveredAt,
+      })));
+    
+    if (error) {
+      console.error('批量添加文章记录失败:', error);
+    }
+  } catch (error) {
+    console.error('批量添加文章记录失败:', error);
+  }
+}
+
+/**
+ * 获取所有文章记录（用于生成RSS）
+ */
+export async function getArticles(limit?: number): Promise<ArticleRecord[]> {
   const supabase = getSupabase();
   
   if (!supabase) {
-    const data = memoryStorage || getDefaultStorageData();
-    return limit ? data.changes.slice(0, limit) : data.changes;
+    return limit ? memoryArticles.slice(0, limit) : memoryArticles;
   }
   
   try {
     const { data, error } = await supabase
-      .from('change_records')
+      .from('articles')
       .select('*')
-      .order('changed_at', { ascending: false })
-      .limit(limit || MAX_CHANGES);
+      .order('discovered_at', { ascending: false })
+      .limit(limit || MAX_ARTICLES);
     
     if (error || !data) {
-      const memData = memoryStorage || getDefaultStorageData();
-      return limit ? memData.changes.slice(0, limit) : memData.changes;
+      return limit ? memoryArticles.slice(0, limit) : memoryArticles;
     }
     
-    return data.map(c => ({
-      siteId: c.site_id,
-      siteName: c.site_name,
-      siteUrl: c.site_url,
-      changedAt: c.changed_at,
-      oldContent: c.old_content || '',
-      newContent: c.new_content,
-      description: c.description,
-      newArticles: c.new_articles,
-      oldArticles: c.old_articles,
+    return data.map(a => ({
+      id: a.id,
+      siteId: a.site_id,
+      siteName: a.site_name,
+      title: a.title,
+      url: a.url,
+      discoveredAt: a.discovered_at,
+      createdAt: a.created_at,
     }));
   } catch (error) {
-    console.error('获取变更记录失败:', error);
-    const data = memoryStorage || getDefaultStorageData();
-    return limit ? data.changes.slice(0, limit) : data.changes;
+    console.error('获取文章记录失败:', error);
+    return limit ? memoryArticles.slice(0, limit) : memoryArticles;
   }
 }
 
 /**
- * 批量更新状态和添加变更
+ * 获取指定网站的文章记录
  */
-export async function batchUpdate(
-  states: SiteState[],
-  changes: ChangeRecord[]
-): Promise<void> {
-  // 更新内存缓存
-  if (!memoryStorage) {
-    memoryStorage = getDefaultStorageData();
-  }
-  
-  for (const state of states) {
-    memoryStorage.sites[state.id] = state;
-  }
-  
-  memoryStorage.changes = [...changes, ...memoryStorage.changes].slice(0, MAX_CHANGES);
-  memoryStorage.lastUpdated = new Date().toISOString();
-  
+export async function getArticlesBySite(siteId: string, limit?: number): Promise<ArticleRecord[]> {
   const supabase = getSupabase();
+  
   if (!supabase) {
-    return;
+    const filtered = memoryArticles.filter(a => a.siteId === siteId);
+    return limit ? filtered.slice(0, limit) : filtered;
   }
   
   try {
-    // 批量更新站点状态
-    if (states.length > 0) {
-      const { error: stateError } = await supabase
-        .from('site_states')
-        .upsert(states.map(s => ({
-          id: s.id,
-          content_hash: s.contentHash,
-          content: s.content,
-          last_checked: s.lastChecked,
-          last_changed: s.lastChanged,
-          articles: s.articles,
-          updated_at: new Date().toISOString(),
-        })));
-      
-      if (stateError) {
-        console.error('批量更新站点状态失败:', stateError);
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .eq('site_id', siteId)
+      .order('discovered_at', { ascending: false })
+      .limit(limit || 100);
+    
+    if (error || !data) {
+      const filtered = memoryArticles.filter(a => a.siteId === siteId);
+      return limit ? filtered.slice(0, limit) : filtered;
+    }
+    
+    return data.map(a => ({
+      id: a.id,
+      siteId: a.site_id,
+      siteName: a.site_name,
+      title: a.title,
+      url: a.url,
+      discoveredAt: a.discovered_at,
+      createdAt: a.created_at,
+    }));
+  } catch (error) {
+    console.error('获取文章记录失败:', error);
+    const filtered = memoryArticles.filter(a => a.siteId === siteId);
+    return limit ? filtered.slice(0, limit) : filtered;
+  }
+}
+
+/**
+ * 检查文章是否已存在（通过URL去重）
+ */
+export async function isArticleExists(url: string): Promise<boolean> {
+  const supabase = getSupabase();
+  
+  if (!supabase) {
+    return memoryArticles.some(a => a.url === url);
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('id')
+      .eq('url', url)
+      .limit(1);
+    
+    if (error) {
+      return memoryArticles.some(a => a.url === url);
+    }
+    
+    return data && data.length > 0;
+  } catch (error) {
+    return memoryArticles.some(a => a.url === url);
+  }
+}
+
+/**
+ * 批量检查文章是否存在
+ */
+export async function filterNewArticles(articles: ArticleInfo[], siteId: string, siteName: string): Promise<ArticleRecord[]> {
+  const now = new Date().toISOString();
+  const newArticles: ArticleRecord[] = [];
+  
+  const supabase = getSupabase();
+  
+  if (!supabase) {
+    // 内存模式：检查 URL 是否已存在
+    const existingUrls = new Set(memoryArticles.map(a => a.url));
+    for (const article of articles) {
+      const url = article.url || '';
+      if (url && !existingUrls.has(url)) {
+        newArticles.push({
+          siteId,
+          siteName,
+          title: article.title,
+          url,
+          discoveredAt: now,
+        });
+        existingUrls.add(url);
+      }
+    }
+    return newArticles;
+  }
+  
+  // Supabase 模式：批量查询已存在的 URL
+  const urls = articles.filter(a => a.url).map(a => a.url as string);
+  if (urls.length === 0) return [];
+  
+  try {
+    const { data: existingData, error } = await supabase
+      .from('articles')
+      .select('url')
+      .in('url', urls);
+    
+    if (error) {
+      console.error('查询已存在文章失败:', error);
+      return [];
+    }
+    
+    const existingUrls = new Set((existingData || []).map(d => d.url));
+    
+    for (const article of articles) {
+      const url = article.url || '';
+      if (url && !existingUrls.has(url)) {
+        newArticles.push({
+          siteId,
+          siteName,
+          title: article.title,
+          url,
+          discoveredAt: now,
+        });
       }
     }
     
-    // 批量插入变更记录
-    if (changes.length > 0) {
-      const { error: changeError } = await supabase
-        .from('change_records')
-        .insert(changes.map(c => ({
-          site_id: c.siteId,
-          site_name: c.siteName,
-          site_url: c.siteUrl,
-          changed_at: c.changedAt,
-          old_content: c.oldContent,
-          new_content: c.newContent,
-          description: c.description,
-          new_articles: c.newArticles,
-          old_articles: c.oldArticles,
-        })));
-      
-      if (changeError) {
-        console.error('批量插入变更记录失败:', changeError);
-      }
-    }
+    return newArticles;
   } catch (error) {
-    console.error('批量更新失败:', error);
+    console.error('过滤新文章失败:', error);
+    return [];
+  }
+}
+
+/**
+ * 获取所有站点状态
+ */
+export async function getAllSiteStates(): Promise<Record<string, SiteState>> {
+  const supabase = getSupabase();
+  
+  if (!supabase) {
+    return memorySiteStates;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('site_states')
+      .select('*');
+    
+    if (error || !data) {
+      return memorySiteStates;
+    }
+    
+    const states: Record<string, SiteState> = {};
+    for (const s of data) {
+      states[s.id] = {
+        id: s.id,
+        contentHash: s.content_hash,
+        content: s.content,
+        lastChecked: s.last_checked,
+        lastChanged: s.last_changed,
+        knownArticleUrls: s.known_article_urls,
+      };
+    }
+    return states;
+  } catch (error) {
+    console.error('获取所有站点状态失败:', error);
+    return memorySiteStates;
   }
 }
 

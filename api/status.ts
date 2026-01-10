@@ -3,9 +3,8 @@
  * GET /api/status - 返回当前监控状态
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getStorageData } from '../src/lib/storage.js';
+import { getAllSiteStates, getArticles } from '../src/lib/storage.js';
 import { sitesConfig } from '../src/config/sites.js';
-import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -16,11 +15,12 @@ export default async function handler(
   }
 
   try {
-    const data = await getStorageData();
+    const states = await getAllSiteStates();
+    const articles = await getArticles(50);
     const configs = sitesConfig;
 
     const sites = configs.map(config => {
-      const state = data.sites[config.id];
+      const state = states[config.id];
       return {
         id: config.id,
         name: config.name,
@@ -33,11 +33,17 @@ export default async function handler(
     });
 
     return res.status(200).json({
-      lastUpdated: data.lastUpdated,
+      lastUpdated: new Date().toISOString(),
       totalSites: sites.length,
       enabledSites: sites.filter(s => s.enabled).length,
-      recentChanges: data.changes.length,
+      totalArticles: articles.length,
       sites,
+      recentArticles: articles.slice(0, 10).map(a => ({
+        site: a.siteName,
+        title: a.title,
+        url: a.url,
+        discoveredAt: a.discoveredAt,
+      })),
     });
   } catch (error) {
     console.error('获取状态失败:', error);
@@ -47,4 +53,3 @@ export default async function handler(
     });
   }
 }
-

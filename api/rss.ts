@@ -3,9 +3,10 @@
  * GET /api/rss - 返回RSS Feed
  * GET /api/rss?format=atom - 返回Atom Feed
  * GET /api/rss?format=json - 返回JSON Feed
+ * GET /api/rss?site=cursor-blog - 返回特定网站的Feed
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getChangeRecords } from '../src/lib/storage.js';
+import { getArticles, getArticlesBySite } from '../src/lib/storage.js';
 import { generateRSS, generateAtom, generateJSONFeed } from '../src/lib/rss-generator.js';
 
 export default async function handler(
@@ -19,17 +20,24 @@ export default async function handler(
 
   try {
     const format = (req.query.format as string) || 'rss';
-    const limit = parseInt(req.query.limit as string) || 50;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const siteId = req.query.site as string;
     
-    // 获取变更记录
-    const changes = await getChangeRecords(limit);
+    // 获取文章记录
+    const articles = siteId 
+      ? await getArticlesBySite(siteId, limit)
+      : await getArticles(limit);
 
     // 获取基础URL
     const baseUrl = `https://${req.headers.host}`;
     
     const options = {
-      title: 'AI-Blog-Detection - AI博客变更检测',
-      description: '监控AI博客内容变更，及时获取更新通知',
+      title: siteId 
+        ? `AI-Blog-Detection - ${siteId}`
+        : 'AI-Blog-Detection - AI博客变更检测',
+      description: siteId
+        ? `监控 ${siteId} 的最新文章`
+        : '监控AI博客内容变更，及时获取更新通知',
       link: baseUrl,
     };
 
@@ -38,22 +46,22 @@ export default async function handler(
 
     switch (format.toLowerCase()) {
       case 'atom':
-        content = generateAtom(changes, options);
+        content = generateAtom(articles, options);
         contentType = 'application/atom+xml; charset=utf-8';
         break;
       case 'json':
-        content = generateJSONFeed(changes, options);
+        content = generateJSONFeed(articles, options);
         contentType = 'application/json; charset=utf-8';
         break;
       case 'rss':
       default:
-        content = generateRSS(changes, options);
+        content = generateRSS(articles, options);
         contentType = 'application/rss+xml; charset=utf-8';
         break;
     }
 
-    // 设置缓存头（缓存1小时）
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+    // 设置缓存头（缓存10分钟）
+    res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=600');
     res.setHeader('Content-Type', contentType);
     
     return res.status(200).send(content);
@@ -65,4 +73,3 @@ export default async function handler(
     });
   }
 }
-

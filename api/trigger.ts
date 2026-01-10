@@ -5,10 +5,9 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites, detectSite } from '../src/lib/detector.js';
-import { updateSiteState, addChangeRecord } from '../src/lib/storage.js';
+import { updateSiteState, filterNewArticles, addArticles } from '../src/lib/storage.js';
 import { hashContent } from '../src/lib/extractor.js';
 import { sitesConfig } from '../src/config/sites.js';
-import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -46,27 +45,26 @@ export default async function handler(
         const now = new Date().toISOString();
         const contentHash = await hashContent(result.currentContent);
         
+        // 更新站点状态
         await updateSiteState({
           id: config.id,
           contentHash,
           content: result.currentContent,
           lastChecked: now,
           lastChanged: result.changed ? now : undefined,
-          articles: result.articles,
+          knownArticleUrls: result.articles?.map(a => a.url).filter(Boolean) as string[],
         });
 
-        if (result.changed && result.previousContent !== undefined) {
-          await addChangeRecord({
+        // 保存新文章到数据库
+        if (result.newArticles && result.newArticles.length > 0) {
+          const newRecords = result.newArticles.map(a => ({
             siteId: config.id,
             siteName: config.name,
-            siteUrl: config.url,
-            changedAt: now,
-            oldContent: result.previousContent,
-            newContent: result.currentContent,
-            description: config.description,
-            newArticles: result.articles,
-            oldArticles: result.previousArticles,
-          });
+            title: a.title,
+            url: a.url || config.url,
+            discoveredAt: now,
+          }));
+          await addArticles(newRecords);
         }
       }
 
@@ -79,15 +77,16 @@ export default async function handler(
           changed: result.changed,
           error: result.error,
           articles: result.articles || [],
+          newArticles: result.newArticles || [],
           contentPreview: result.currentContent.substring(0, 500),
         },
       });
     } else {
       // 检测所有网站
-      const { results, changes } = await detectAllSites(configs);
+      const { results, newArticles } = await detectAllSites(configs);
 
       // 构建详细的结果
-      const detailedResults = results.map((r, i) => {
+      const detailedResults = results.map((r) => {
         const config = configs.find(c => c.id === r.siteId);
         return {
           siteId: r.siteId,
@@ -96,7 +95,9 @@ export default async function handler(
           changed: r.changed,
           error: r.error,
           articles: r.articles || [],
+          newArticles: r.newArticles || [],
           articleCount: r.articles?.length || 0,
+          newArticleCount: r.newArticles?.length || 0,
         };
       });
 
@@ -105,14 +106,15 @@ export default async function handler(
         timestamp: new Date().toISOString(),
         stats: {
           total: results.length,
-          changed: changes.length,
+          changed: results.filter(r => r.changed).length,
           errors: results.filter(r => r.error).length,
+          newArticles: newArticles.length,
         },
         results: detailedResults,
-        changes: changes.map(c => ({
-          site: c.siteName,
-          url: c.siteUrl,
-          newArticles: c.newArticles,
+        newArticles: newArticles.map(a => ({
+          site: a.siteName,
+          title: a.title,
+          url: a.url,
         })),
       });
     }

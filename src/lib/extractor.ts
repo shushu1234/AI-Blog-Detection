@@ -6,16 +6,32 @@ import * as cheerio from 'cheerio';
 import type { ArticleInfo, ExtractionResult, SiteConfig } from '../types/index.js';
 
 /**
- * 将简单的 XPath 转换为 CSS 选择器
- * 支持的 XPath 语法：
+ * 将 XPath 转换为 CSS 选择器
+ * 支持的语法:
  * - //tag -> tag
- * - //tag[@attr='value'] -> tag[attr='value']
+ * - //tag[@attr='value'] -> tag[attr="value"]
+ * - //tag[contains(@attr, 'value')] -> tag[attr*="value"]
  * - //tag[@attr] -> tag[attr]
  * - //tag//subtag -> tag subtag
- * - //*[@id='value'] -> [id='value']
+ * - //a | //b -> a, b (或运算)
+ * - //*[@id='value'] -> [id="value"]
+ * - /@attr -> 提取属性
  */
 function xpathToCssSelector(xpath: string): { selector: string; isAttr: boolean; attrName?: string } {
-  // 检查是否是属性选择器（如 @href）
+  // 处理多个选择器（XPath 的 | 运算符）
+  if (xpath.includes(' | ')) {
+    const parts = xpath.split(' | ').map(p => p.trim());
+    const results = parts.map(p => xpathToCssSelector(p));
+    
+    // 如果任一部分是属性选择器，整体都当作属性选择器
+    const isAttr = results.some(r => r.isAttr);
+    const attrName = results.find(r => r.attrName)?.attrName;
+    const selector = results.map(r => r.selector).join(', ');
+    
+    return { selector, isAttr, attrName };
+  }
+  
+  // 检查是否是属性选择器（如 /@href）
   const attrMatch = xpath.match(/\/@(\w+)$/);
   if (attrMatch) {
     const attrName = attrMatch[1];
@@ -28,27 +44,50 @@ function xpathToCssSelector(xpath: string): { selector: string; isAttr: boolean;
 }
 
 /**
- * 转换 XPath 路径部分为 CSS 选择器
+ * 转换单个 XPath 路径部分为 CSS 选择器
  */
 function convertXPathPart(xpath: string): string {
-  let css = xpath
-    // 移除开头的 //
-    .replace(/^\/\//, '')
-    // 处理 //* 
-    .replace(/^\*/, '*')
-    // 处理 // 为后代选择器
-    .replace(/\/\//g, ' ')
-    // 处理 / 为子选择器
-    .replace(/\//g, ' > ')
-    // 处理 [@attr='value']
-    .replace(/\[@(\w+)='([^']+)'\]/g, '[$1="$2"]')
-    .replace(/\[@(\w+)="([^"]+)"\]/g, '[$1="$2"]')
-    // 处理 [@attr]
-    .replace(/\[@(\w+)\]/g, '[$1]')
-    // 处理谓词 [tag] -> :has(tag)
-    .replace(/\[(\w+)\]/g, ':has($1)')
-    // 处理 text()
-    .replace(/\/text\(\)$/, '');
+  let css = xpath;
+  
+  // 移除开头的 //
+  css = css.replace(/^\/\//, '');
+  
+  // 处理 //* 
+  css = css.replace(/^\*/, '*');
+  
+  // 先用占位符保护属性值中的特殊字符
+  const attrValues: string[] = [];
+  css = css.replace(/\[contains\(\s*@(\w+)\s*,\s*['"]([^'"]+)['"]\s*\)\]/g, (_, attr, value) => {
+    attrValues.push(value);
+    return `[${attr}*="__ATTR_${attrValues.length - 1}__"]`;
+  });
+  css = css.replace(/\[\s*@(\w+)\s*=\s*['"]([^'"]+)['"]\s*\]/g, (_, attr, value) => {
+    attrValues.push(value);
+    return `[${attr}="__ATTR_${attrValues.length - 1}__"]`;
+  });
+  
+  // 处理复合条件 [contains(@a, 'v') and contains(@b, 'w')]
+  // 已经在上面处理了，跳过
+  
+  // 处理 // 为后代选择器
+  css = css.replace(/\/\//g, ' ');
+  
+  // 处理 / 为子选择器（但不影响属性值）
+  css = css.replace(/\//g, ' > ');
+  
+  // 处理 [@attr]
+  css = css.replace(/\[\s*@(\w+)\s*\]/g, '[$1]');
+  
+  // 处理谓词 [tag] -> :has(tag)
+  css = css.replace(/\[([a-z][a-z0-9]*)\]/gi, ':has($1)');
+  
+  // 处理 text()
+  css = css.replace(/ > text\(\)$/, '');
+  
+  // 恢复属性值
+  attrValues.forEach((value, index) => {
+    css = css.replace(`__ATTR_${index}__`, value);
+  });
   
   return css.trim();
 }
@@ -92,6 +131,9 @@ export function extractAttributesByXPath(html: string, xpath: string): string[] 
     const $ = cheerio.load(html);
     const { selector, isAttr, attrName } = xpathToCssSelector(xpath);
     
+    // Debug: 打印转换后的选择器
+    // console.log(`XPath: ${xpath} -> CSS: ${selector}, isAttr: ${isAttr}, attrName: ${attrName}`);
+    
     const values: string[] = [];
     
     $(selector).each((_, element) => {
@@ -111,6 +153,28 @@ export function extractAttributesByXPath(html: string, xpath: string): string[] 
     
     return values;
   } catch (error) {
+    // 如果转换后的选择器失败，尝试直接作为 CSS 选择器并提取 href
+    try {
+      const $ = cheerio.load(html);
+      // 尝试从 XPath 中提取基本的选择器模式
+      const simpleSelector = xpath
+        .replace(/^\/\//, '')
+        .replace(/\/\//g, ' ')
+        .replace(/\/@\w+$/, '')
+        .replace(/\[contains\(\s*@(\w+)\s*,\s*['"]([^'"]+)['"]\s*\)\]/g, '[$1*="$2"]');
+      
+      const values: string[] = [];
+      $(simpleSelector).each((_, element) => {
+        const href = $(element).attr('href');
+        if (href?.trim()) {
+          values.push(href.trim());
+        }
+      });
+      if (values.length > 0) return values;
+    } catch {
+      // 忽略
+    }
+    
     console.error('XPath属性提取失败:', error);
     return [];
   }

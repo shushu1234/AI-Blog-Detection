@@ -11,6 +11,56 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 - 💾 **状态持久化**：使用 Supabase PostgreSQL 存储历史状态
 - 🔔 **变更记录**：保留最近 100 条变更历史
 
+## 📋 监控网站列表
+
+### AI 编辑器 / IDE
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| Cursor Blog | Cursor AI 编辑器官方博客 | [cursor.com](https://cursor.com/cn/blog) |
+| Windsurf Blog | Windsurf (Cognition) 博客 | [windsurf.com](https://windsurf.com/blog) |
+| Cline Blog | Cline AI 助手博客 | [cline.bot](https://cline.bot/blog) |
+
+### AI 研究 / 大厂
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| Anthropic Engineering | Anthropic 工程博客 | [anthropic.com](https://www.anthropic.com/engineering) |
+| OpenAI Developer Blog | OpenAI 开发者博客 | [developers.openai.com](https://developers.openai.com/blog) |
+| OpenAI Research | OpenAI 研究文章 | [openai.com](https://openai.com/research/index/) |
+| Google Research Blog | Google 研究博客 | [research.google](https://research.google/blog/) |
+| Microsoft AI News | 微软 AI 新闻 | [news.microsoft.com](https://news.microsoft.com/source/topics/ai/) |
+
+### LLM 框架 / Agent
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| LangChain Blog | LangChain 官方博客 | [blog.langchain.com](https://blog.langchain.com/) |
+| LlamaIndex Blog | LlamaIndex 官方博客 | [llamaindex.ai](https://www.llamaindex.ai/blog) |
+| CrewAI Blog | CrewAI 多智能体框架博客 | [crewai.com](https://www.crewai.com/blog) |
+| MCP Blog | Model Context Protocol 博客 | [modelcontextprotocol.io](https://blog.modelcontextprotocol.io/) |
+| Letta Blog | Letta (MemGPT) 博客 | [letta.com](https://www.letta.com/blog) |
+| Mem0 Blog | Mem0 记忆层博客 | [mem0.ai](https://mem0.ai/blog) |
+
+### AI 开发平台 / Low-Code
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| Dify Blog | Dify LLM 应用开发平台博客 | [dify.ai](https://dify.ai/blog) |
+| n8n Blog | n8n 自动化工作流博客 | [blog.n8n.io](https://blog.n8n.io/) |
+| Langfuse Blog | Langfuse LLM 可观测性博客 | [langfuse.com](https://langfuse.com/blog) |
+| Langflow Blog | Langflow 低代码 AI 博客 | [langflow.org](https://www.langflow.org/blog) |
+
+### RAG / 向量数据库
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| RAGFlow Blog | RAGFlow 开源 RAG 引擎博客 | [ragflow.io](https://ragflow.io/blog) |
+| Weaviate Blog | Weaviate 向量数据库博客 | [weaviate.io](https://weaviate.io/blog) |
+| Milvus Blog | Milvus 向量数据库博客 | [milvus.io](https://milvus.io/blog) |
+| Qdrant Blog | Qdrant 向量数据库博客 | [qdrant.tech](https://qdrant.tech/blog/) |
+
+### 其他 AI 产品
+| 网站 | 描述 | 链接 |
+|------|------|------|
+| Lovart Blog | Lovart AI 设计博客 | [lovart.ai](https://www.lovart.ai/zh/blog) |
+| Manus Blog | Manus AI 博客 | [manus.im](https://manus.im/zh-cn/blog) |
+
 ## 🚀 快速开始
 
 ### 1. 部署到 Vercel
@@ -30,41 +80,20 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 1. 进入你的项目 → **SQL Editor**
 2. 运行 `supabase/init.sql` 中的 SQL 脚本创建表
 
-```sql
--- 创建站点状态表
-CREATE TABLE IF NOT EXISTS site_states (
-  id TEXT PRIMARY KEY,
-  content_hash TEXT NOT NULL,
-  content TEXT NOT NULL,
-  last_checked TIMESTAMPTZ NOT NULL,
-  last_changed TIMESTAMPTZ,
-  articles JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 4. 订阅 RSS
 
--- 创建变更记录表
-CREATE TABLE IF NOT EXISTS change_records (
-  id SERIAL PRIMARY KEY,
-  site_id TEXT NOT NULL,
-  site_name TEXT NOT NULL,
-  site_url TEXT NOT NULL,
-  changed_at TIMESTAMPTZ NOT NULL,
-  old_content TEXT,
-  new_content TEXT NOT NULL,
-  description TEXT,
-  new_articles JSONB,
-  old_articles JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+部署完成后，访问以下地址订阅：
 
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_change_records_changed_at ON change_records(changed_at DESC);
-```
+- **RSS 2.0**: `https://your-domain.vercel.app/api/rss`
+- **Atom**: `https://your-domain.vercel.app/api/rss?format=atom`
+- **JSON Feed**: `https://your-domain.vercel.app/api/rss?format=json`
+- **按站点筛选**: `https://your-domain.vercel.app/api/rss?site=cursor-blog`
 
-### 4. 配置监控网站
+## 📝 配置说明
 
-编辑 `src/config/sites.ts` 文件，添加你要监控的网站：
+### 添加新网站
+
+编辑 `src/config/sites.ts` 文件：
 
 ```typescript
 export const sitesConfig: SiteConfig[] = [
@@ -72,74 +101,35 @@ export const sitesConfig: SiteConfig[] = [
     id: 'my-site',
     name: '我的博客',
     url: 'https://example.com/blog',
-    xpath: '//article//h2',
-    articleUrlXPath: '//article//a/@href',
+    cssSelector: 'article h2',  // CSS 选择器（推荐）
+    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
     description: '监控示例博客的最新文章',
     enabled: true,
   },
 ];
 ```
 
-### 5. 订阅 RSS
-
-部署完成后，访问以下地址订阅：
-
-- **RSS 2.0**: `https://your-domain.vercel.app/api/rss`
-- **Atom**: `https://your-domain.vercel.app/api/rss?format=atom`
-- **JSON Feed**: `https://your-domain.vercel.app/api/rss?format=json`
-
-## 📝 配置说明
-
-### 网站配置字段
+### 配置字段
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `id` | string | ✅ | 唯一标识符 |
 | `name` | string | ✅ | 网站名称（显示在RSS中） |
 | `url` | string | ✅ | 要监控的网页URL |
-| `xpath` | string | ⭕ | XPath表达式（提取标题内容） |
+| `cssSelector` | string | ⭕ | CSS选择器（推荐） |
+| `xpath` | string | ⭕ | XPath表达式（与cssSelector二选一） |
 | `articleUrlXPath` | string | ❌ | 文章URL的XPath表达式 |
-| `cssSelector` | string | ⭕ | CSS选择器（与xpath二选一） |
 | `description` | string | ❌ | 描述信息 |
 | `enabled` | boolean | ❌ | 是否启用（默认true） |
 
-### XPath 示例
-
-```javascript
-// 提取所有h2标题
-"//h2"
-
-// 提取特定class的div内容
-"//div[@class='news-list']//h2"
-
-// 提取文章链接
-"//article//a/@href"
-
-// 提取id为content的元素
-"//*[@id='content']"
-```
-
 ## 🔌 API 端点
 
-### GET /api/rss
-
-获取 RSS 订阅
-
-**参数**：
-- `format`: 输出格式 (`rss` | `atom` | `json`)，默认 `rss`
-- `limit`: 返回条目数量，默认 `50`
-
-### GET /api/status
-
-获取监控状态
-
-### POST /api/trigger 或 GET /api/trigger
-
-手动触发检测（也可在首页点击按钮触发）
-
-### GET /api/cron
-
-Cron 触发器端点（由 Vercel Cron 自动调用）
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/rss` | GET | 获取 RSS 订阅（支持 `format`、`limit`、`site` 参数） |
+| `/api/status` | GET | 查看监控状态 |
+| `/api/trigger` | GET/POST | 手动触发检测 |
+| `/api/cron` | GET | Cron 触发器（自动调用） |
 
 ## ⚙️ 环境变量
 
@@ -148,9 +138,6 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 | `SUPABASE_URL` | ✅ | Supabase 项目 URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase Service Role Key |
 | `CRON_SECRET` | ❌ | Cron 请求验证密钥 |
-| `API_KEY` | ❌ | 手动触发API的访问密钥 |
-
-> Vercel + Supabase 集成会自动设置这些环境变量
 
 ## 📅 Cron 调度
 
@@ -174,9 +161,6 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 ```bash
 # 安装依赖
 npm install
-
-# 启动开发服务器
-npx vercel dev
 
 # 本地测试抓取
 npm run test

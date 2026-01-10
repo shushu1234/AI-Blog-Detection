@@ -9,10 +9,10 @@ export interface SiteConfig {
   /** 要检测的URL */
   url: string;
   /** XPath表达式，用于提取要监控的内容（文章标题） */
-  xpath: string;
+  xpath?: string;
   /** 可选：文章URL的XPath表达式 */
   articleUrlXPath?: string;
-  /** 可选：CSS选择器（如果不使用XPath） */
+  /** CSS选择器（推荐使用，比XPath更可靠） */
   cssSelector?: string;
   /** 可选：自定义描述 */
   description?: string;

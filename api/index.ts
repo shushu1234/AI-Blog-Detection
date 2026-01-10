@@ -3,12 +3,77 @@
  * GET / - 返回项目信息和使用说明
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { sitesConfig } from '../src/config/sites.js';
+
+// 网站分类
+const siteCategories = [
+  {
+    name: 'AI 编辑器 / IDE',
+    icon: '💻',
+    sites: ['cursor-blog', 'windsurf-blog', 'cline-blog'],
+  },
+  {
+    name: 'AI 研究 / 大厂',
+    icon: '🔬',
+    sites: ['anthropic-engineering', 'openai-developer-blog', 'openai-research', 'google-research-blog', 'microsoft-ai-news'],
+  },
+  {
+    name: 'LLM 框架 / Agent',
+    icon: '🤖',
+    sites: ['langchain-blog', 'llamaindex-blog', 'crewai-blog', 'mcp-blog', 'letta-blog', 'mem0-blog'],
+  },
+  {
+    name: 'AI 开发平台',
+    icon: '🛠️',
+    sites: ['dify-blog', 'n8n-blog', 'langfuse-blog', 'langflow-blog'],
+  },
+  {
+    name: 'RAG / 向量数据库',
+    icon: '🗄️',
+    sites: ['ragflow-blog', 'weaviate-blog', 'milvus-blog', 'qdrant-blog'],
+  },
+  {
+    name: '其他 AI 产品',
+    icon: '✨',
+    sites: ['lovart-blog', 'manus-blog'],
+  },
+];
 
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
   const baseUrl = `https://${req.headers.host}`;
+
+  // 构建网站配置映射
+  const sitesMap = new Map(sitesConfig.map(s => [s.id, s]));
+
+  // 生成网站列表HTML
+  const sitesListHtml = siteCategories.map(cat => {
+    const categorySites = cat.sites
+      .map(id => sitesMap.get(id))
+      .filter(Boolean);
+    
+    if (categorySites.length === 0) return '';
+
+    return `
+      <div class="category">
+        <div class="category-header">
+          <span class="category-icon">${cat.icon}</span>
+          <span class="category-name">${cat.name}</span>
+          <span class="category-count">${categorySites.length}</span>
+        </div>
+        <div class="sites-grid">
+          ${categorySites.map(site => `
+            <a href="${site!.url}" target="_blank" class="site-card">
+              <div class="site-card-name">${site!.name}</div>
+              <div class="site-card-url">${new URL(site!.url).hostname}</div>
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
 
   const html = `
 <!DOCTYPE html>
@@ -31,6 +96,8 @@ export default async function handler(
       --orange: #f97316;
       --orange-dim: rgba(249, 115, 22, 0.1);
       --red: #ef4444;
+      --purple: #a855f7;
+      --purple-dim: rgba(168, 85, 247, 0.1);
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -44,7 +111,7 @@ export default async function handler(
       padding: 60px 20px;
     }
     .container {
-      max-width: 800px;
+      max-width: 900px;
       width: 100%;
     }
     .header {
@@ -66,6 +133,27 @@ export default async function handler(
     .subtitle {
       color: var(--text-muted);
       font-size: 16px;
+    }
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-top: 24px;
+    }
+    .stat-item {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
     }
     .card {
       background: var(--card);
@@ -212,13 +300,13 @@ export default async function handler(
       font-size: 13px;
       color: var(--text-muted);
     }
-    .stat-value {
+    .stat-value-sm {
       font-weight: 600;
       color: var(--text);
     }
-    .stat.success .stat-value { color: var(--accent); }
-    .stat.changed .stat-value { color: var(--orange); }
-    .stat.error .stat-value { color: var(--red); }
+    .stat.success .stat-value-sm { color: var(--accent); }
+    .stat.changed .stat-value-sm { color: var(--orange); }
+    .stat.error .stat-value-sm { color: var(--red); }
     .site-result {
       background: rgba(255,255,255,0.02);
       border: 1px solid var(--border);
@@ -314,6 +402,62 @@ export default async function handler(
       background: rgba(239, 68, 68, 0.1);
       border-radius: 8px;
     }
+    /* 网站列表样式 */
+    .category {
+      margin-bottom: 24px;
+    }
+    .category:last-child {
+      margin-bottom: 0;
+    }
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .category-icon {
+      font-size: 18px;
+    }
+    .category-name {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .category-count {
+      font-size: 11px;
+      background: var(--purple-dim);
+      color: var(--purple);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .sites-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .site-card {
+      display: block;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .site-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .site-card-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .site-card-url {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
     .footer {
       text-align: center;
       margin-top: 40px;
@@ -336,6 +480,16 @@ export default async function handler(
       <div class="logo">🔍</div>
       <h1>AI-Blog-Detection</h1>
       <p class="subtitle">AI博客变更检测 · 自动生成 RSS 订阅</p>
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="stat-value">${sitesConfig.filter(s => s.enabled !== false).length}</div>
+          <div class="stat-label">监控站点</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">${siteCategories.length}</div>
+          <div class="stat-label">分类</div>
+        </div>
+      </div>
     </header>
 
     <div class="card">
@@ -351,6 +505,11 @@ export default async function handler(
         </div>
         <div id="siteResults"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>📋 监控网站列表</h2>
+      ${sitesListHtml}
     </div>
 
     <div class="card">
@@ -374,7 +533,7 @@ export default async function handler(
         <div class="endpoint-info">
           <span class="endpoint-method get">GET</span>
           <span class="endpoint-path">/api/rss</span>
-          <p class="endpoint-desc">获取 RSS 订阅（支持 format 参数）</p>
+          <p class="endpoint-desc">获取 RSS 订阅（支持 format、site 参数）</p>
         </div>
         <a href="${baseUrl}/api/rss" class="endpoint-link">访问 →</a>
       </div>
@@ -388,16 +547,9 @@ export default async function handler(
       </div>
       <div class="endpoint">
         <div class="endpoint-info">
-          <span class="endpoint-method post">POST</span>
+          <span class="endpoint-method get">GET</span>
           <span class="endpoint-path">/api/trigger</span>
           <p class="endpoint-desc">手动触发检测</p>
-        </div>
-      </div>
-      <div class="endpoint">
-        <div class="endpoint-info">
-          <span class="endpoint-method get">GET</span>
-          <span class="endpoint-path">/api/cron</span>
-          <p class="endpoint-desc">Cron 触发器（自动调用）</p>
         </div>
       </div>
     </div>
@@ -419,7 +571,6 @@ export default async function handler(
       const siteResults = document.getElementById('siteResults');
       const timestamp = document.getElementById('timestamp');
       
-      // 禁用按钮，显示加载状态
       btn.disabled = true;
       btnText.innerHTML = '<div class="spinner"></div> 正在检测中...';
       
@@ -428,34 +579,37 @@ export default async function handler(
         const data = await response.json();
         
         if (data.success) {
-          // 显示结果区域
           results.classList.add('show');
           
-          // 更新统计
           stats.innerHTML = \`
             <div class="stat success">
               <span>✓</span>
-              <span class="stat-value">\${data.stats.total}</span>
+              <span class="stat-value-sm">\${data.stats.total}</span>
               <span>个站点</span>
             </div>
             <div class="stat changed">
               <span>🔄</span>
-              <span class="stat-value">\${data.stats.changed}</span>
+              <span class="stat-value-sm">\${data.stats.changed}</span>
               <span>有更新</span>
             </div>
+            \${data.stats.newArticles > 0 ? \`
+            <div class="stat" style="color: var(--purple);">
+              <span>📝</span>
+              <span class="stat-value-sm" style="color: var(--purple);">\${data.stats.newArticles}</span>
+              <span>篇新文章</span>
+            </div>
+            \` : ''}
             \${data.stats.errors > 0 ? \`
             <div class="stat error">
               <span>⚠️</span>
-              <span class="stat-value">\${data.stats.errors}</span>
+              <span class="stat-value-sm">\${data.stats.errors}</span>
               <span>个错误</span>
             </div>
             \` : ''}
           \`;
           
-          // 更新时间戳
           timestamp.textContent = '检测时间: ' + new Date(data.timestamp).toLocaleString('zh-CN');
           
-          // 显示每个站点的结果
           siteResults.innerHTML = data.results.map(result => \`
             <div class="site-result">
               <div class="site-header">
@@ -478,7 +632,6 @@ export default async function handler(
                         <div class="article-title">
                           \${article.url ? \`<a href="\${article.url}" target="_blank">\${article.title}</a>\` : article.title}
                         </div>
-                        \${article.url ? \`<div class="article-url">\${article.url}</div>\` : ''}
                       </div>
                     </div>
                   \`).join('')}
@@ -508,7 +661,6 @@ export default async function handler(
           </div>
         \`;
       } finally {
-        // 恢复按钮状态
         btn.disabled = false;
         btnText.innerHTML = '⚡ 再次检测';
       }

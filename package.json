@@ -1,7 +1,7 @@
 {
-  "name": "webdetect",
+  "name": "AI-Blog-Detection",
   "version": "1.0.0",
-  "description": "网页变更检测工具，自动生成RSS订阅",
+  "description": "AI网站Blog变更检测工具，自动生成RSS订阅",
   "type": "module",
   "scripts": {
     "dev": "vercel dev",

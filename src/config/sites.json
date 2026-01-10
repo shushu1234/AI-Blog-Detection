@@ -1,0 +1,19 @@
+[
+  {
+    "id": "cursor-blog",
+    "name": "Cursor Blog",
+    "url": "https://cursor.com/cn/blog",
+    "xpath": "//main[@id='main']//article",
+    "description": "监控Cursor Blog的最新文章",
+    "enabled": true
+  },
+  {
+    "id": "lovart-blog",
+    "name": "Lovart Blog",
+    "url": "https://www.lovart.ai/zh/blog",
+    "xpath": "//article//h2",
+    "description": "监控Lovart Blog的最新文章",
+    "enabled": true
+  }
+]
+

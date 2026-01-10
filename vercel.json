@@ -1,4 +1,10 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [
+    { "source": "/", "destination": "/api/index" }
+  ],
   "crons": [
     {
       "path": "/api/cron",
@@ -11,4 +17,3 @@
     }
   }
 }
-

@@ -98,7 +98,7 @@ export async function updateSiteState(state: SiteState): Promise<void> {
 }
 
 /**
- * 添加单篇文章记录
+ * 添加单篇文章记录（忽略重复URL）
  */
 export async function addArticle(article: ArticleRecord): Promise<void> {
   memoryArticles.unshift(article);
@@ -112,13 +112,19 @@ export async function addArticle(article: ArticleRecord): Promise<void> {
   try {
     const { error } = await supabase
       .from('articles')
-      .insert({
-        site_id: article.siteId,
-        site_name: article.siteName,
-        title: article.title,
-        url: article.url,
-        discovered_at: article.discoveredAt,
-      });
+      .upsert(
+        {
+          site_id: article.siteId,
+          site_name: article.siteName,
+          title: article.title,
+          url: article.url,
+          discovered_at: article.discoveredAt,
+        },
+        { 
+          onConflict: 'url',
+          ignoreDuplicates: true 
+        }
+      );
     
     if (error) {
       console.error('添加文章记录失败:', error);
@@ -129,7 +135,7 @@ export async function addArticle(article: ArticleRecord): Promise<void> {
 }
 
 /**
- * 批量添加文章记录
+ * 批量添加文章记录（忽略重复URL）
  */
 export async function addArticles(articles: ArticleRecord[]): Promise<void> {
   if (articles.length === 0) return;
@@ -140,15 +146,22 @@ export async function addArticles(articles: ArticleRecord[]): Promise<void> {
   if (!supabase) return;
   
   try {
+    // 使用 upsert 并在 URL 冲突时忽略（不更新）
     const { error } = await supabase
       .from('articles')
-      .insert(articles.map(a => ({
-        site_id: a.siteId,
-        site_name: a.siteName,
-        title: a.title,
-        url: a.url,
-        discovered_at: a.discoveredAt,
-      })));
+      .upsert(
+        articles.map(a => ({
+          site_id: a.siteId,
+          site_name: a.siteName,
+          title: a.title,
+          url: a.url,
+          discovered_at: a.discoveredAt,
+        })),
+        { 
+          onConflict: 'url',
+          ignoreDuplicates: true 
+        }
+      );
     
     if (error) {
       console.error('批量添加文章记录失败:', error);

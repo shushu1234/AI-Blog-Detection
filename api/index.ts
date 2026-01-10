@@ -65,7 +65,7 @@ export default async function handler(
         </div>
         <div class="sites-grid">
           ${categorySites.map(site => `
-            <a href="${site!.url}" target="_blank" class="site-card">
+            <a href="${baseUrl}/api/site?id=${site!.id}" class="site-card">
               <div class="site-card-name">${site!.name}</div>
               <div class="site-card-url">${new URL(site!.url).hostname}</div>
             </a>

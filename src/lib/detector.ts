@@ -108,8 +108,8 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
         };
         statesToUpdate.push(state);
 
-        // 记录变更
-        if (result.changed && result.previousContent !== undefined) {
+        // 记录变更（包括首次检测）
+        if (result.changed) {
           const newArticles = findNewArticles(
             result.articles || [],
             result.previousArticles
@@ -120,7 +120,7 @@ export async function detectAllSites(configs: SiteConfig[]): Promise<{
             siteName: config.name,
             siteUrl: config.url,
             changedAt: now,
-            oldContent: result.previousContent,
+            oldContent: result.previousContent || '',
             newContent: result.currentContent,
             description: config.description,
             newArticles: newArticles.length > 0 ? newArticles : undefined,

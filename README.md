@@ -33,20 +33,20 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 
 ### 3. 配置监控网站
 
-编辑 `src/config/sites.json` 文件，添加你要监控的网站：
+编辑 `src/config/sites.ts` 文件，添加你要监控的网站：
 
-```json
-[
+```typescript
+export const sitesConfig: SiteConfig[] = [
   {
-    "id": "my-site",
-    "name": "我的博客",
-    "url": "https://example.com/blog",
-    "xpath": "//article//h2",
-    "articleUrlXPath": "//article//a/@href",
-    "description": "监控示例博客的最新文章",
-    "enabled": true
-  }
-]
+    id: 'my-site',
+    name: '我的博客',
+    url: 'https://example.com/blog',
+    xpath: '//article//h2',
+    articleUrlXPath: '//article//a/@href',
+    description: '监控示例博客的最新文章',
+    enabled: true,
+  },
+];
 ```
 
 ### 4. 订阅 RSS

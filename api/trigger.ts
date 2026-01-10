@@ -7,7 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites, detectSite } from '../src/lib/detector.js';
 import { updateSiteState, addChangeRecord } from '../src/lib/storage.js';
 import { hashContent } from '../src/lib/extractor.js';
-import sitesConfig from '../src/config/sites.json';
+import { sitesConfig } from '../src/config/sites.js';
 import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
@@ -31,7 +31,7 @@ export default async function handler(
 
   try {
     const siteId = req.query.site as string;
-    const configs = sitesConfig as SiteConfig[];
+    const configs = sitesConfig;
 
     if (siteId) {
       // 检测特定网站

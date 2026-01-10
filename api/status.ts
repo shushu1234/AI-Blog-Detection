@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getStorageData } from '../src/lib/storage.js';
-import sitesConfig from '../src/config/sites.json';
+import { sitesConfig } from '../src/config/sites.js';
 import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
@@ -17,7 +17,7 @@ export default async function handler(
 
   try {
     const data = await getStorageData();
-    const configs = sitesConfig as SiteConfig[];
+    const configs = sitesConfig;
 
     const sites = configs.map(config => {
       const state = data.sites[config.id];

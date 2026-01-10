@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites } from '../src/lib/detector.js';
-import sitesConfig from '../src/config/sites.json';
+import { sitesConfig } from '../src/config/sites.js';
 import type { SiteConfig } from '../src/types/index.js';
 
 export default async function handler(
@@ -26,7 +26,7 @@ export default async function handler(
     console.log(`共有 ${sitesConfig.length} 个网站配置`);
 
     const startTime = Date.now();
-    const { results, changes } = await detectAllSites(sitesConfig as SiteConfig[]);
+    const { results, changes } = await detectAllSites(sitesConfig);
     const duration = Date.now() - startTime;
 
     // 统计结果

@@ -4,7 +4,7 @@
  */
 import { fetchPage } from '../lib/fetcher.js';
 import { extractArticles, hashContent } from '../lib/extractor.js';
-import sitesConfig from '../config/sites.json' with { type: 'json' };
+import { sitesConfig } from '../config/sites.js';
 import type { SiteConfig, ArticleInfo } from '../types/index.js';
 
 const COLORS = {
@@ -115,7 +115,7 @@ async function main() {
   log('cyan', '║             AI-Blog-Detection 本地测试工具                         ║');
   log('cyan', '╚════════════════════════════════════════════════════════════════════╝');
 
-  const configs = sitesConfig as SiteConfig[];
+  const configs = sitesConfig;
   const enabledConfigs = configs.filter(c => c.enabled !== false);
 
   log('dim', `\n共 ${configs.length} 个配置，${enabledConfigs.length} 个已启用\n`);

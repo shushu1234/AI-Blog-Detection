@@ -3,7 +3,6 @@
  * 支持简化的 XPath 语法和 CSS 选择器
  */
 import * as cheerio from 'cheerio';
-import type { CheerioAPI, Cheerio, Element } from 'cheerio';
 import type { ArticleInfo, ExtractionResult, SiteConfig } from '../types/index.js';
 
 /**

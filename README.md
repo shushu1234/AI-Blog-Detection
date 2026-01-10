@@ -8,7 +8,7 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 - 🎯 **精准提取**：支持 XPath 和 CSS 选择器精确提取监控内容
 - 🔗 **文章链接**：支持提取文章URL和标题，RSS中包含直达链接
 - 📰 **RSS 订阅**：自动生成 RSS/Atom/JSON Feed，支持各种 RSS 阅读器
-- 💾 **状态持久化**：使用 Vercel KV 存储历史状态
+- 💾 **状态持久化**：使用 Vercel Edge Config 存储历史状态（超低延迟）
 - 🔔 **变更记录**：保留最近 100 条变更历史
 
 ## 🚀 快速开始
@@ -17,11 +17,19 @@ AI博客变更检测工具 - 自动监控AI相关博客内容变化并生成 RSS
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/AI-Blog-Detection)
 
-### 2. 配置 Vercel KV
+### 2. 配置 Vercel Edge Config
 
-1. 在 Vercel 控制台创建一个 KV 数据库
-2. 将 KV 数据库连接到你的项目
-3. Vercel 会自动设置所需的环境变量
+1. 在 Vercel 控制台进入你的项目
+2. 点击 **Storage** → **Create Database** → 选择 **Edge Config**
+3. 创建后，点击 **Connect to Project** 连接到你的项目
+4. Vercel 会自动设置 `EDGE_CONFIG` 环境变量
+
+**配置写入功能**（可选，用于持久化存储）：
+
+5. 进入 Edge Config 详情页，复制 **Edge Config ID**
+6. 在 **Settings** → **Environment Variables** 中添加：
+   - `EDGE_CONFIG_ID`: 你的 Edge Config ID
+   - `VERCEL_API_TOKEN`: 从 [Vercel Settings](https://vercel.com/account/tokens) 创建的 API Token
 
 ### 3. 配置监控网站
 
@@ -137,10 +145,13 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
-| `KV_REST_API_URL` | ✅ | Vercel KV API URL（自动设置） |
-| `KV_REST_API_TOKEN` | ✅ | Vercel KV API Token（自动设置） |
+| `EDGE_CONFIG` | ✅ | Edge Config 连接字符串（自动设置） |
+| `EDGE_CONFIG_ID` | ❌ | Edge Config ID（用于写入，需手动设置） |
+| `VERCEL_API_TOKEN` | ❌ | Vercel API Token（用于写入，需手动设置） |
 | `CRON_SECRET` | ❌ | Cron 请求验证密钥 |
 | `API_KEY` | ❌ | 手动触发API的访问密钥 |
+
+> **注意**：如果不配置 `EDGE_CONFIG_ID` 和 `VERCEL_API_TOKEN`，检测功能仍然可用，但数据只会保存在内存中，重启后会丢失。
 
 ## 📅 Cron 调度
 
@@ -170,8 +181,11 @@ Cron 触发器端点（由 Vercel Cron 自动调用）
 # 安装依赖
 npm install
 
+# 拉取环境变量（需要先 vercel login）
+vercel env pull
+
 # 启动开发服务器
-npm run dev
+npx vercel dev
 
 # 本地测试抓取
 npm run test

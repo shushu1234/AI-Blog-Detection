@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run build",
+  "devCommand": "",
   "outputDirectory": ".",
   "framework": null,
   "rewrites": [

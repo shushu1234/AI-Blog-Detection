@@ -4,6 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sitesConfig } from '../src/config/sites.js';
+import { getLastCrawlTime } from '../src/lib/storage.js';
 
 // 网站分类
 const siteCategories = [
@@ -44,6 +45,12 @@ export default async function handler(
   res: VercelResponse
 ) {
   const baseUrl = `https://${req.headers.host}`;
+
+  // 获取最近爬取时间
+  const lastCrawlTime = await getLastCrawlTime();
+  const lastCrawlTimeStr = lastCrawlTime 
+    ? new Date(lastCrawlTime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+    : '从未爬取';
 
   // 构建网站配置映射
   const sitesMap = new Map(sitesConfig.map(s => [s.id, s]));
@@ -154,6 +161,29 @@ export default async function handler(
       font-size: 13px;
       color: var(--text-muted);
       margin-top: 4px;
+    }
+    .last-crawl-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+      padding: 12px 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .last-crawl-info strong {
+      color: var(--accent);
+    }
+    .last-crawl-icon {
+      font-size: 16px;
+    }
+    .cron-hint {
+      font-size: 12px;
+      opacity: 0.7;
     }
     .card {
       background: var(--card);
@@ -489,6 +519,11 @@ export default async function handler(
           <div class="stat-value">${siteCategories.length}</div>
           <div class="stat-label">分类</div>
         </div>
+      </div>
+      <div class="last-crawl-info">
+        <span class="last-crawl-icon">🕐</span>
+        <span>最近爬取：<strong>${lastCrawlTimeStr}</strong></span>
+        <span class="cron-hint">（每天 00:00 北京时间自动爬取）</span>
       </div>
     </header>
 

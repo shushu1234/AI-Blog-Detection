@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites } from '../src/lib/detector.js';
 import { sitesConfig } from '../src/config/sites.js';
+import { updateLastCrawlTime } from '../src/lib/storage.js';
 
 export default async function handler(
   req: VercelRequest,
@@ -27,6 +28,9 @@ export default async function handler(
     const startTime = Date.now();
     const { results, newArticles } = await detectAllSites(sitesConfig);
     const duration = Date.now() - startTime;
+
+    // 无论是否有新文章，都更新爬取时间
+    await updateLastCrawlTime();
 
     // 统计结果
     const stats = {

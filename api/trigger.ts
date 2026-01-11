@@ -5,7 +5,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAllSites, detectSite } from '../src/lib/detector.js';
-import { updateSiteState, filterNewArticles, addArticles } from '../src/lib/storage.js';
+import { updateSiteState, filterNewArticles, addArticles, updateLastCrawlTime } from '../src/lib/storage.js';
 import { hashContent } from '../src/lib/extractor.js';
 import { sitesConfig } from '../src/config/sites.js';
 
@@ -84,6 +84,9 @@ export default async function handler(
     } else {
       // 检测所有网站
       const { results, newArticles } = await detectAllSites(configs);
+
+      // 无论是否有新文章，都更新爬取时间
+      await updateLastCrawlTime();
 
       // 构建详细的结果
       const detailedResults = results.map((r) => {

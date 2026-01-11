@@ -33,3 +33,14 @@ CREATE INDEX IF NOT EXISTS idx_articles_url ON articles(url);
 
 -- 4. 为 site_states 表创建索引
 CREATE INDEX IF NOT EXISTS idx_site_states_updated_at ON site_states(updated_at);
+
+-- 5. 全局配置表（存储最近爬取时间等全局状态）
+CREATE TABLE IF NOT EXISTS global_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 插入默认配置
+INSERT INTO global_config (key, value) VALUES ('last_crawl_time', '')
+ON CONFLICT (key) DO NOTHING;

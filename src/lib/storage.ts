@@ -382,3 +382,60 @@ export async function getAllSiteStates(): Promise<Record<string, SiteState>> {
 export function isStorageAvailable(): boolean {
   return !!getSupabase();
 }
+
+/**
+ * 更新最近爬取时间
+ */
+export async function updateLastCrawlTime(): Promise<void> {
+  const now = new Date().toISOString();
+  
+  const supabase = getSupabase();
+  if (!supabase) {
+    console.log('Supabase 未配置，无法保存爬取时间');
+    return;
+  }
+  
+  try {
+    const { error } = await supabase
+      .from('global_config')
+      .upsert({
+        key: 'last_crawl_time',
+        value: now,
+        updated_at: now,
+      });
+    
+    if (error) {
+      console.error('更新爬取时间失败:', error);
+    }
+  } catch (error) {
+    console.error('更新爬取时间失败:', error);
+  }
+}
+
+/**
+ * 获取最近爬取时间
+ */
+export async function getLastCrawlTime(): Promise<string | null> {
+  const supabase = getSupabase();
+  
+  if (!supabase) {
+    return null;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('global_config')
+      .select('value')
+      .eq('key', 'last_crawl_time')
+      .single();
+    
+    if (error || !data || !data.value) {
+      return null;
+    }
+    
+    return data.value;
+  } catch (error) {
+    console.error('获取爬取时间失败:', error);
+    return null;
+  }
+}

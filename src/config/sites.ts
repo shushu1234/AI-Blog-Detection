@@ -27,15 +27,6 @@ export const sitesConfig: SiteConfig[] = [
     description: '监控 Windsurf Blog 的最新文章',
     enabled: true,
   },
-  {
-    id: 'cline-blog',
-    name: 'Cline Blog',
-    url: 'https://cline.bot/blog',
-    cssSelector: 'a[href*="/blog/"] h2, a[href*="/blog/"] h3',
-    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
-    description: '监控 Cline Blog 的最新文章',
-    enabled: true,
-  },
 
   // === AI 研究 / 大厂 ===
   {
@@ -74,15 +65,7 @@ export const sitesConfig: SiteConfig[] = [
     description: '监控 Google Research Blog 的最新研究文章',
     enabled: true,
   },
-  {
-    id: 'microsoft-ai-news',
-    name: 'Microsoft AI News',
-    url: 'https://news.microsoft.com/source/topics/ai/',
-    cssSelector: 'article h2 a, article h3 a',
-    articleUrlXPath: '//article//h2//a/@href | //article//h3//a/@href',
-    description: '监控 Microsoft AI 新闻',
-    enabled: true,
-  },
+
 
   // === LLM 框架 / Agent ===
   {
@@ -123,16 +106,7 @@ export const sitesConfig: SiteConfig[] = [
     description: '监控 Model Context Protocol Blog 的最新文章',
     enabled: true,
   },
-  {
-    id: 'letta-blog',
-    name: 'Letta Blog',
-    url: 'https://www.letta.com/blog',
-    // SPA 网站，使用通用标题选择器
-    cssSelector: 'h2, h3',
-    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
-    description: '监控 Letta (MemGPT) Blog 的最新文章',
-    enabled: true,
-  },
+
   {
     id: 'mem0-blog',
     name: 'Mem0 Blog',
@@ -224,15 +198,6 @@ export const sitesConfig: SiteConfig[] = [
   },
 
   // === 其他 AI 产品 ===
-  {
-    id: 'lovart-blog',
-    name: 'Lovart Blog',
-    url: 'https://www.lovart.ai/zh/blog',
-    cssSelector: 'a[href*="/blog/"] article h2',
-    articleUrlXPath: '//a[contains(@href, "/blog/")]/@href',
-    description: '监控 Lovart Blog 的最新文章',
-    enabled: true,
-  },
   {
     id: 'manus-blog',
     name: 'Manus Blog',
